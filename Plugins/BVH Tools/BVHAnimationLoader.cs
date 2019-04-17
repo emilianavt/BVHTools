@@ -1,9 +1,9 @@
-﻿using System.Collections;
+﻿using System;
+using System.Linq;
 using System.Collections.Generic;
 using UnityEngine;
 using UniHumanoid;
 using System.IO;
-using System;
 
 public class BVHAnimationLoader : MonoBehaviour {
     [Header("Loader settings")]
@@ -171,12 +171,26 @@ public class BVHAnimationLoader : MonoBehaviour {
         if (targetAvatar == null) {
             throw new InvalidOperationException("No target avatar set.");
         }
-        rootBone = BVHRecorder.getRootBone(targetAvatar);
-        if (rootBone == null) {
-            throw new InvalidOperationException("No root bone found.");
-        }
 
         bvh = Bvh.Parse(bvhData);
+
+        Queue<Transform> transforms = new Queue<Transform>();
+        transforms.Enqueue(targetAvatar.transform);
+        while (transforms.Any()) {
+            Transform transform = transforms.Dequeue();
+            if (transform.name == bvh.Root.Name) {
+                rootBone = transform;
+                break;
+            }
+            foreach (Transform child in transform.GetChildren()) {
+                transforms.Enqueue(child);
+            }
+        }
+        if (rootBone == null) {
+            throw new InvalidOperationException("No root bone \"" + bvh.Root.Name + "\" found." );
+        }
+
+
         frames = bvh.FrameCount;
         clip = new AnimationClip();
         clip.name = "BVHClip";
