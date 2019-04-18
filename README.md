@@ -49,3 +49,19 @@ has to be enabled.
 To load the file back into Unity, attach the "BVH Animation Loader" component
 to your avatar, set it as the "Target Avatar" and enter the filename. Also
 check the "Auto Start" box and then play the scene. Your animation should play.
+
+## Video
+
+You can watch a quick introduction video on the usage of these Unity components
+[here](https://www.youtube.com/watch?v=DM7UZuAgBJk).
+
+## License
+
+This software is distributed under the terms of the MIT license.
+
+
+## About
+
+BVH Tools was made by [Emiliana](https://twitter.com/emiliana_vt) for
+Virtual YouTuber purposes, but it can also be used for games or other
+applications.
