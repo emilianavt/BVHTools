@@ -9,21 +9,29 @@ public class BVHAnimationLoader : MonoBehaviour {
     [Header("Loader settings")]
     [Tooltip("This is the target avatar for which the animation should be loaded. Bone names should be identical to those in the BVH file and unique. All bones should be initialized with zero rotations. This is usually the case for VRM avatars.")]
     public Animator targetAvatar;
-    //[Tooltip("This is the root bone of the target avatar, usually the hips.")]
-    //public Transform rootBone;
     [Tooltip("This is the path to the BVH file that should be loaded. Bone offsets are currently being ignored by this loader.")]
     public string bvhFile;
     [Tooltip("The frame time is the number of milliseconds per frame.")]
-    public float frameTime = 1000f/60f;
+    public float frameTime = 1000f / 24f;
+    [Tooltip("This is the name that will be set on the animation clip. Leaving this empty is also okay.")]
+    public string clipName;
+    [Header("Advanced settings")]
+    [Tooltip("When this option is enabled, standard Unity humanoid bone names will be mapped to the corresponding bones of the skeleton.")]
+    public bool standardBoneNames = true;
+    [Tooltip("When this option is disabled, bone names have to match exactly.")]
+    public bool flexibleBoneNames = true;
+    [Tooltip("This allows you to give a mapping from names in the BVH file to actual bone names. If standard bone names are enabled, the target names may also be Unity humanoid bone names. Entries with empty BVH names will be ignored.")]
+    public FakeDictionary[] boneRenamingMap = null;
     [Header("Animation settings")]
-    [Tooltip("This is the Animation component to which the clip will be added. If left empty, a new Animation component will be added to the target avatar.")]
-    public Animation anim;
-    [Tooltip("This field can be used to read out the the animation clip after being loaded. A new clip will always be created when loading.")]
-    public AnimationClip clip;
     [Tooltip("When this option is set, the animation start playing automatically after being loaded.")]
     public bool autoPlay = false;
     [Tooltip("When this option is set, the animation will be loaded and start playing as soon as the script starts running. This also implies the option above being enabled.")]
     public bool autoStart = false;
+    [Header("Animation")]
+    [Tooltip("This is the Animation component to which the clip will be added. If left empty, a new Animation component will be added to the target avatar.")]
+    public Animation anim;
+    [Tooltip("This field can be used to read out the the animation clip after being loaded. A new clip will always be created when loading.")]
+    public AnimationClip clip;
 
     private Transform rootBone;
     private string prefix;
@@ -31,6 +39,14 @@ public class BVHAnimationLoader : MonoBehaviour {
     private int frames;
     private Dictionary<string, string> pathToBone;
     private Dictionary<string, string[]> boneToMuscles;
+    private Dictionary<string, Transform> nameMap;
+    private Dictionary<string, string> renamingMap;
+
+    [Serializable]
+    public struct FakeDictionary {
+        public string bvhName;
+        public string targetName;
+    }
 
     // BVH to Unity
     Quaternion fromEulerYXZ(Vector3 euler) {
@@ -47,7 +63,50 @@ public class BVHAnimationLoader : MonoBehaviour {
         return a;
     }
 
-    private void getCurves(string path, BvhNode node) {
+    private string flexibleName(string name) {
+        if (!flexibleBoneNames) {
+            return name;
+        }
+        name = name.Replace(" ", "");
+        name = name.Replace("_", "");
+        name = name.ToLower();
+        return name;
+    }
+
+    private Transform getBoneByName(string name, Transform transform, bool first) {
+        if (nameMap == null) {
+            if (standardBoneNames) {
+                Dictionary<Transform, string> boneMap;
+                BVHRecorder.populateBoneMap(out boneMap, targetAvatar);
+                nameMap = boneMap.ToDictionary(kp => flexibleName(kp.Value), kp => kp.Key);
+            } else {
+                nameMap = new Dictionary<string, Transform>();
+            }
+        }
+        string targetName = flexibleName(name);
+        if (renamingMap.ContainsKey(targetName)) {
+            targetName = renamingMap[targetName];
+        }
+        if (first) { 
+            if (flexibleName(transform.name) == targetName) {
+                return transform;
+            }
+            if (nameMap.ContainsKey(targetName) && nameMap[targetName] == transform) {
+                return transform;
+            }
+        }
+        foreach (Transform child in transform.GetChildren()) {
+            if (flexibleName(child.name) == targetName) {
+                return child;
+            }
+            if (nameMap.ContainsKey(targetName) && nameMap[targetName] == child) {
+                return child;
+            }
+        }
+        throw new InvalidOperationException("Could not find bone \"" + name + "\" under bone \"" + transform.name + "\".");
+    }
+
+    private void getCurves(string path, BvhNode node, Transform bone, bool first) {
         bool posX = false;
         bool posY = false;
         bool posZ = false;
@@ -57,11 +116,14 @@ public class BVHAnimationLoader : MonoBehaviour {
         
         Keyframe[][] keyframes = new Keyframe[6][];
         string[] props = new string[6];
+        Transform nodeTransform = getBoneByName(node.Name, bone, first);
 
         if (path != prefix) {
             path += "/";
         }
-        path += node.Name;
+        if (rootBone != targetAvatar.transform || !first) {
+            path += nodeTransform.name;
+        }
 
         // This needs to be changed to gather from all channels into two vector3, invert the coordinate system transformation and then make keyframes from it
         foreach (Channel channel in node.Channels) {
@@ -140,7 +202,7 @@ public class BVHAnimationLoader : MonoBehaviour {
         }
 
         foreach (BvhNode child in node.Children) {
-            getCurves(path, child);
+            getCurves(path, child, nodeTransform, false);
         }
     }
 
@@ -178,7 +240,7 @@ public class BVHAnimationLoader : MonoBehaviour {
         transforms.Enqueue(targetAvatar.transform);
         while (transforms.Any()) {
             Transform transform = transforms.Dequeue();
-            if (transform.name == bvh.Root.Name) {
+            if (flexibleName(transform.name) == flexibleName(bvh.Root.Name)) {
                 rootBone = transform;
                 break;
             }
@@ -187,19 +249,35 @@ public class BVHAnimationLoader : MonoBehaviour {
             }
         }
         if (rootBone == null) {
+            rootBone = BVHRecorder.getRootBone(targetAvatar);
+            Debug.LogWarning("Using \"" + rootBone.name + "\" as the root bone.");
+        }
+        if (rootBone == null) {
             throw new InvalidOperationException("No root bone \"" + bvh.Root.Name + "\" found." );
         }
 
+        renamingMap = new Dictionary<string, string>();
+        foreach (FakeDictionary entry in boneRenamingMap) {
+            if (entry.bvhName != "" && entry.targetName != "") {
+                renamingMap.Add(flexibleName(entry.bvhName), flexibleName(entry.targetName));
+            }
+        }
 
         frames = bvh.FrameCount;
         clip = new AnimationClip();
-        clip.name = "BVHClip";
+        clip.name = "BVHClip (" + System.Guid.NewGuid() + ")";
+        if (clipName != "") {
+            clip.name = clipName;
+        }
         clip.legacy = true;
         prefix = getPathBetween(rootBone, targetAvatar.transform, true, true);
 
-        getCurves(prefix, bvh.Root);
+        getCurves(prefix, bvh.Root, rootBone, true);
         if (anim == null) {
-            anim = targetAvatar.gameObject.AddComponent<Animation>();
+            anim = targetAvatar.gameObject.GetComponent<Animation>();
+            if (anim == null) {
+                anim = targetAvatar.gameObject.AddComponent<Animation>();
+            }
         }
         anim.AddClip(clip, clip.name);
         anim.clip = clip;

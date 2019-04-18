@@ -10,32 +10,36 @@ using UnityEngine;
 public class BVHRecorder : MonoBehaviour {
     [Header("Recorder settings")]
     [Tooltip("The bone rotations will be recorded every frame time milliseconds. Bone locations are recorded when this script starts running or genHierarchy() is called.")]
-    public float frameTime = 1000.0f / 60.0f;
-    [Tooltip("Coordinates are recorded with six decimals. If you require a BVH file where only two decimals are required, you can turn this on.")]
-    public bool lowPrecision = false;
+    public float frameTime = 1000.0f / 24.0f;
     [Tooltip("This is the filename to which the BVH file will be saved. If no filename is given, a random one will be generated when the script starts running. When importing this file into Blender, use the following settings: \"- Y Forward\", \"Z Up\", and \"Euler(YXZ)\"")]
     public string filename;
     [Tooltip("When this box is checked, motion data will be recorded. It is possible to uncheck and check this box to pause and resume the capturing process.")]
     public bool capturing = false;
-    //[Tooltip("When this option is enabled, humanoid bones will be used to build the skeleton. Bone names will be replaced with standard names. If you don't know what this means, just leave it unticked.")]
-    [Tooltip("When this option is enabled, only humanoid bones will be targeted for building the skeleton. If you don't know what this means, just leave it unticked.")]
+    [Header("Advanced settings")]
+    [Tooltip("When this option is enabled, only humanoid bones will be targeted for detecting bones. This means that things like hair bones will not be added to the list of bones when detecting bones.")]
     public bool enforceHumanoidBones = false;
+    [Tooltip("This option can be used to rename humanoid bones to standard bone names. If you don't know what this means, just leave it unticked.")]
+    public bool renameBones = false;
+    [Tooltip("When this is enabled, after a drop in frame rate, multiple frames may be recorded in quick succession. When it is disabled, at least frame time milliseconds will pass before the next frame is recorded. Enabling it will help ensure that your recorded clip has the correct duration.")]
+    public bool catchUp = true;
+    [Tooltip("Coordinates are recorded with six decimals. If you require a BVH file where only two decimals are required, you can turn this on.")]
+    public bool lowPrecision = false;
     [Tooltip("This should be checked when BVHRecorder is used through its API. It will disable its Start() and Update() functions. If you don't know what this means, just leave it unticked.")]
     public bool scripted = false;
 
     [Header("Motion target")]
     [Tooltip("This is the avatar for which motion should be captured. All skinned meshes that are part of the avatar should be children of this object. All bones should be initialized with zero rotations. This is usually the case for VRM avatars.")]
     public Animator targetAvatar = null;
-    //[Tooltip("This is the root bone for the avatar, usually the hips. Please avoid having bone names with space characters in them, because Blender will import the BVH file with all spaces replaced with underscores.")]
-    //public Transform rootBone = null;
+    [Tooltip("This is the root bone for the avatar, usually the hips. If this is not set, it will be detected automatically.")]
+    public Transform rootBone = null;
     [Tooltip("This list contains all the bones for which motion will be recorded. If nothing is assigned, it will be automatically generated when the script starts. When manually setting up an avatar the Unity Editor, you can press the corresponding button at the bottom of this component to automatically populate the list and add or remove bones manually if necessary.")]
     public List<Transform> bones;
 
-    private Transform rootBone = null;
     private SkelTree skel = null;
     private List<SkelTree> boneOrder = null;
     private string hierarchy;
     private float lastFrame;
+    private bool first = false;
     private List<string> frames = null;
     private Dictionary<Transform, string> boneMap;
     
@@ -47,14 +51,14 @@ public class BVHRecorder : MonoBehaviour {
         
         public SkelTree(Transform bone, Dictionary<Transform, string> boneMap) {
             name = bone.gameObject.name;
-            /*if (boneMap != null) {
+            if (boneMap != null) {
                 if (boneMap.ContainsKey(bone)) {
                     name = boneMap[bone];
-                } else {
-                    Debug.LogWarning("A non-humanoid bone was added to the skeleton: " + name);
-                    name = "Unknown" + name;
+                } else if (boneMap.ContainsValue(name)) {
+                    //Debug.LogWarning("A non-humanoid bone was added to the skeleton: " + name);
+                    name = name + "_";
                 }
-            }*/
+            }
             if (bone.localRotation.eulerAngles.x < 0 || bone.localRotation.eulerAngles.x > 0 || bone.localRotation.eulerAngles.y < 0 || bone.localRotation.eulerAngles.y > 0 || bone.localRotation.eulerAngles.z < 0 || bone.localRotation.eulerAngles.z > 0) {
                 throw new InvalidOperationException("Bone " + bone.name + " with non-zero rotation not supported.");
             }
@@ -63,9 +67,9 @@ public class BVHRecorder : MonoBehaviour {
         }
     }
 
-    private void populateBoneMap() {
-        if (enforceHumanoidBones && !targetAvatar.avatar.isHuman) {
-            throw new InvalidOperationException("Enforce humanoid bones can only be used with humanoid avatars.");
+    public static void populateBoneMap(out Dictionary<Transform, string> boneMap, Animator targetAvatar) {
+        if (!targetAvatar.avatar.isHuman) {
+            throw new InvalidOperationException("Enforce humanoid bones and rename bones can only be used with humanoid avatars.");
         }
 
         Dictionary<string, int> usedNames = new Dictionary<string, int>();
@@ -77,10 +81,7 @@ public class BVHRecorder : MonoBehaviour {
             Transform bodyBone = targetAvatar.GetBoneTransform(bone);
             if (bodyBone != null && bone != HumanBodyBones.LastBone) {
                 if (usedNames.ContainsKey(bone.ToString())) {
-                    int num = usedNames[bone.ToString()];
-                    num++;
-                    boneMap.Add(bodyBone, bone.ToString() + "_" + num);
-                    usedNames[bone.ToString()] = num;
+                    throw new InvalidOperationException("Multiple bones were assigned to the same standard bone name.");
                 } else {
                     boneMap.Add(bodyBone, bone.ToString());
                     usedNames.Add(bone.ToString(), 1);
@@ -118,7 +119,7 @@ public class BVHRecorder : MonoBehaviour {
         }
 
         if (enforceHumanoidBones) {
-            populateBoneMap();
+            populateBoneMap(out boneMap, targetAvatar);
         }
 
         rootBone = getRootBone(targetAvatar);
@@ -198,7 +199,7 @@ public class BVHRecorder : MonoBehaviour {
         }
 
         if (enforceHumanoidBones) {
-            populateBoneMap();
+            populateBoneMap(out boneMap, targetAvatar);
         } else {
             boneMap = null;
         }
@@ -329,7 +330,8 @@ public class BVHRecorder : MonoBehaviour {
         //skel.transform.localRotation = rot;
 
         frames = new List<string>();
-        lastFrame = - 2 * frameTime;
+        lastFrame = Time.time;
+        first = true;
     }
 
     // This function stores the current frame's bone positions as a string
@@ -396,11 +398,18 @@ public class BVHRecorder : MonoBehaviour {
 	
 	void LateUpdate () {
         if (scripted || frames == null || hierarchy == "" || !capturing) {
+            lastFrame = Time.time;
+            first = true;
             return;
         }
-        if (1000 * lastFrame + frameTime < 1000 * Time.time) {
-            lastFrame = Time.time;
+        if (first || 1000 * lastFrame + frameTime < 1000 * Time.time) {
+            if (catchUp) {
+                lastFrame = lastFrame + frameTime / 1000f;
+            } else {
+                lastFrame = Time.time;
+            }
             captureFrame();
+            first = false;
             //capturing = false;
         }
 	}

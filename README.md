@@ -32,10 +32,6 @@ the following settings:
     Up: Z Up
     Rotation: Euler (YXZ)
 
-If any of your bone names contain spaces, Blender will replace them with
-underscores, which might lead to trouble when loading the file back into Unity.
-It is best to avoid spaces in bone names for this reason.
-
 ## Loading
 
 To load the file back into Unity, attach the "BVH Animation Loader" component
