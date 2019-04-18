@@ -80,6 +80,9 @@ public class BVHRecorder : MonoBehaviour {
         boneMap = new Dictionary<Transform, string>();
         HumanBodyBones[] bones = (HumanBodyBones[])Enum.GetValues(typeof(HumanBodyBones));
         foreach (HumanBodyBones bone in bones) {
+            if (bone < 0 || bone >= HumanBodyBones.LastBone) {
+                continue;
+            }
             Transform bodyBone = targetAvatar.GetBoneTransform(bone);
             if (bodyBone != null && bone != HumanBodyBones.LastBone) {
                 if (usedNames.ContainsKey(bone.ToString())) {
