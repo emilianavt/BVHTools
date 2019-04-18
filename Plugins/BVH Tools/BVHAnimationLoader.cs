@@ -11,6 +11,8 @@ public class BVHAnimationLoader : MonoBehaviour {
     public Animator targetAvatar;
     [Tooltip("This is the path to the BVH file that should be loaded. Bone offsets are currently being ignored by this loader.")]
     public string bvhFile;
+    [Tooltip("When this option is set, the BVH file will be assumed to have the Z axis as up and the Y axis as forward instead of the normal BVH conventions.")]
+    public bool blender = true;
     [Tooltip("The frame time is the number of milliseconds per frame.")]
     public float frameTime = 1000f / 24f;
     [Tooltip("This is the name that will be set on the animation clip. Leaving this empty is also okay.")]
@@ -49,8 +51,8 @@ public class BVHAnimationLoader : MonoBehaviour {
     }
 
     // BVH to Unity
-    Quaternion fromEulerYXZ(Vector3 euler) {
-        return Quaternion.AngleAxis(euler.y, Vector3.up) * Quaternion.AngleAxis(euler.x, Vector3.right) * Quaternion.AngleAxis(euler.z, Vector3.forward);
+    Quaternion fromEulerZXY(Vector3 euler) {
+        return Quaternion.AngleAxis(euler.z, Vector3.forward) * Quaternion.AngleAxis(euler.x, Vector3.right) * Quaternion.AngleAxis(euler.y, Vector3.up);
     }
 
     private float wrapAngle(float a) {
@@ -176,7 +178,10 @@ public class BVHAnimationLoader : MonoBehaviour {
         if (posX && posY && posZ) {
             for (int i = 0; i < frames; i++) {
                 Vector3 posBVH = new Vector3(keyframes[0][i].value, keyframes[1][i].value, keyframes[2][i].value);
-                Vector3 pos = new Vector3(-posBVH.y, posBVH.z, posBVH.x);
+                Vector3 pos = new Vector3(-posBVH.x, posBVH.y, posBVH.z);
+                if (blender) {
+                    pos = new Vector3(-posBVH.x, posBVH.z, -posBVH.y);
+                }
                 keyframes[0][i].value = pos.x;
                 keyframes[1][i].value = pos.y;
                 keyframes[2][i].value = pos.z;
@@ -189,8 +194,11 @@ public class BVHAnimationLoader : MonoBehaviour {
         if (rotX && rotY && rotZ) { 
             for (int i = 0; i < frames; i++) {
                 Vector3 eulerBVH = new Vector3(keyframes[3][i].value, keyframes[4][i].value, keyframes[5][i].value);
-                Quaternion rot = fromEulerYXZ(eulerBVH);
-                Quaternion rot2 = new Quaternion(rot.y, -rot.z, -rot.x, rot.w);
+                Quaternion rot = fromEulerZXY(eulerBVH);
+                Quaternion rot2 = new Quaternion(rot.x, -rot.y, -rot.z, rot.w);
+                if (blender) {
+                    rot2 = new Quaternion(rot.x, -rot.z, rot.y, rot.w);
+                }
                 Vector3 euler = rot2.eulerAngles;
                 keyframes[3][i].value = wrapAngle(euler.x);
                 keyframes[4][i].value = wrapAngle(euler.y);

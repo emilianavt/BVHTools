@@ -11,8 +11,10 @@ public class BVHRecorder : MonoBehaviour {
     [Header("Recorder settings")]
     [Tooltip("The bone rotations will be recorded every frame time milliseconds. Bone locations are recorded when this script starts running or genHierarchy() is called.")]
     public float frameTime = 1000.0f / 24.0f;
-    [Tooltip("This is the filename to which the BVH file will be saved. If no filename is given, a random one will be generated when the script starts running. When importing this file into Blender, use the following settings: \"- Y Forward\", \"Z Up\", and \"Euler(YXZ)\"")]
+    [Tooltip("This is the filename to which the BVH file will be saved. If no filename is given, a random one will be generated when the script starts running.")]
     public string filename;
+    [Tooltip("When this option is set, the BVH file will have the Z axis as up and the Y axis as forward instead of the normal BVH conventions.")]
+    public bool blender = true;
     [Tooltip("When this box is checked, motion data will be recorded. It is possible to uncheck and check this box to pause and resume the capturing process.")]
     public bool capturing = false;
     [Header("Advanced settings")]
@@ -60,7 +62,7 @@ public class BVHRecorder : MonoBehaviour {
                 }
             }
             if (bone.localRotation.eulerAngles.x < 0 || bone.localRotation.eulerAngles.x > 0 || bone.localRotation.eulerAngles.y < 0 || bone.localRotation.eulerAngles.y > 0 || bone.localRotation.eulerAngles.z < 0 || bone.localRotation.eulerAngles.z > 0) {
-                throw new InvalidOperationException("Bone " + bone.name + " with non-zero rotation not supported.");
+                //throw new InvalidOperationException("Bone " + bone.name + " with non-zero rotation not supported.");
             }
             transform = bone;
             children = new List<SkelTree>();
@@ -234,7 +236,10 @@ public class BVHRecorder : MonoBehaviour {
 
     // This formats local translation vectors
     private string getOffset(Vector3 offset) {
-        Vector3 offset2 = new Vector3(offset.z, -offset.x, offset.y);
+        Vector3 offset2 = new Vector3(-offset.x, offset.y, offset.z);
+        if (blender) {
+            offset2 = new Vector3(-offset.x, -offset.z, offset.y);
+        }
         if (lowPrecision) {
             return string.Format(CultureInfo.InvariantCulture, "{0: 0.00;-0.00}\t{1: 0.00;-0.00}\t{2: 0.00;-0.00}", offset2.x, offset2.y, offset2.z);
         } else {
@@ -245,25 +250,30 @@ public class BVHRecorder : MonoBehaviour {
     // From: http://bediyap.com/programming/convert-quaternion-to-euler-rotations/
     Vector3 manualEuler(float a, float b, float c, float d, float e) {
         Vector3 euler = new Vector3();
-        euler.x = Mathf.Asin(c) * Mathf.Rad2Deg;
-        euler.y = Mathf.Atan2(a, b) * Mathf.Rad2Deg;
-        euler.z = Mathf.Atan2(d, e) * Mathf.Rad2Deg;
+        euler.z = Mathf.Atan2(a, b) * Mathf.Rad2Deg; // Z
+        euler.x = Mathf.Asin(c) * Mathf.Rad2Deg;     // Y
+        euler.y = Mathf.Atan2(d, e) * Mathf.Rad2Deg; // X
         return euler;
     }
 
     // Unity to BVH
-    Vector3 eulerYXZ(Quaternion q) {
-        return manualEuler(2 * (q.x * q.z + q.w * q.y),
-            q.w * q.w - q.x * q.x - q.y * q.y + q.z * q.z,
-            -2 * (q.y * q.z - q.w * q.x),
-            2 * (q.x * q.y + q.w * q.z),
-            q.w * q.w - q.x * q.x + q.y * q.y - q.z * q.z);
+    Vector3 eulerZXY(Quaternion q) {
+        return manualEuler(-2 * (q.x * q.y - q.w * q.z),
+                      q.w * q.w - q.x * q.x + q.y * q.y - q.z * q.z,
+                      2 * (q.y * q.z + q.w * q.x),
+                     -2 * (q.x * q.z - q.w * q.y),
+                      q.w * q.w - q.x * q.x - q.y * q.y + q.z * q.z); // ZXY
     }
 
-    // This formats local Euler rotation vectors. BVH files expect rotations to be given in the order Z, X, Y.
+
     private string getRotation(Quaternion rot) {
-        Quaternion rot2 = new Quaternion(-rot.z, rot.x, -rot.y, rot.w);
-        Vector3 angles = eulerYXZ(rot2);
+        Quaternion rot2 = new Quaternion(rot.x, -rot.y, -rot.z, rot.w);
+        if (blender) {
+            rot2 = new Quaternion(rot.x, rot.z, -rot.y, rot.w);
+        }
+        Vector3 angles = eulerZXY(rot2);
+        // This does convert to XZY order, but it should be ZXY?
+
         if (lowPrecision) {
             return string.Format(CultureInfo.InvariantCulture, "{0: 0.00;-0.00}\t{1: 0.00;-0.00}\t{2: 0.00;-0.00}", wrapAngle(angles.z), wrapAngle(angles.x), wrapAngle(angles.y));
         } else {
@@ -285,8 +295,8 @@ public class BVHRecorder : MonoBehaviour {
     // This function recursively generates JOINT entries for the hierarchy section of the BVH file
     private string genJoint(int level, SkelTree bone) {
         // I thought I'd pretend to be a bone with zero rotation, but it did nothing.
-        //Quaternion rot = bone.transform.localRotation;
-        //bone.transform.localRotation = Quaternion.identity;
+        Quaternion rot = bone.transform.localRotation;
+        bone.transform.localRotation = Quaternion.identity;
 
         string result = tabs(level) + "JOINT " + bone.name + "\n" + tabs(level) + "{\n" + tabs(level) + "\tOFFSET\t" + getOffset(bone.transform.position - bone.transform.parent.position) + "\n" + tabs(level) + "\tCHANNELS 3 Zrotation Xrotation Yrotation\n";
         boneOrder.Add(bone);
@@ -301,7 +311,7 @@ public class BVHRecorder : MonoBehaviour {
         }
 
         result += tabs(level) + "}\n";
-        //bone.transform.localRotation = rot;
+        bone.transform.localRotation = rot;
 
         return result;
     }
@@ -312,8 +322,8 @@ public class BVHRecorder : MonoBehaviour {
             throw new InvalidOperationException("Skeleton not initialized. You can initialize the skeleton by calling buildSkeleton().");
         }
 
-        //Quaternion rot = skel.transform.localRotation;
-        //skel.transform.localRotation = Quaternion.identity;
+        Quaternion rot = skel.transform.localRotation;
+        skel.transform.localRotation = Quaternion.identity;
         boneOrder = new List<SkelTree>() { skel };
         hierarchy = "HIERARCHY\nROOT " + skel.name + "\n{\n\tOFFSET\t0.00\t0.00\t0.00\n\tCHANNELS 6 Xposition Yposition Zposition Zrotation Xrotation Yrotation\n";
 
@@ -327,7 +337,7 @@ public class BVHRecorder : MonoBehaviour {
         }
 
         hierarchy += "}\n";
-        //skel.transform.localRotation = rot;
+        skel.transform.localRotation = rot;
 
         frames = new List<string>();
         lastFrame = Time.time;

@@ -5,6 +5,9 @@ This package provides a component to record motion data of VRM avatars in BVH
 format files. A second component allows loading such files as (legacy)
 animation clips back into Unity.
 
+Other than depending on one script from UniVRM, this should actually work
+with non-VRM avatars too.
+
 ## Requirements
 
 The animation loader depends on the Bvh.cs file from UniVRM, so make sure you
@@ -25,12 +28,21 @@ Editor script should give something of an overview.
 
 ## Editing
 
-You can load and edit your BVH file in Blender. When importing it, please use
-the following settings:
+If you want to edit your file in Blender, please enable the "Blender" checkbox
+for both recording and loading and use the following settings during import
+into Blender:
 
-    Forward: -Y Forward
+    Forward: Y Forward
     Up: Z Up
-    Rotation: Euler (YXZ)
+
+When importing files into Blender that were recorded with Blender mode disabled,
+please use the following settings instead:
+
+    Forward: -Z Forward
+    Up: Y Up
+
+When loading files that were exported from Blender, the Blender checkbox always
+has to be enabled.
 
 ## Loading
 
