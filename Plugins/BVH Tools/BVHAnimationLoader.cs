@@ -96,7 +96,8 @@ public class BVHAnimationLoader : MonoBehaviour {
                 return transform;
             }
         }
-        foreach (Transform child in transform.GetChildren()) {
+        for (int i = 0; i < transform.childCount; i++) {
+            Transform child = transform.GetChild(i);
             if (flexibleName(child.name) == targetName) {
                 return child;
             }
@@ -204,7 +205,6 @@ public class BVHAnimationLoader : MonoBehaviour {
             for (int i = 0; i < frames; i++) {
                 Vector3 eulerBVH = new Vector3(wrapAngle(values[3][i]), wrapAngle(values[4][i]), wrapAngle(values[5][i]));
                 Quaternion rot = fromEulerZXY(eulerBVH);
-                Quaternion rot2;
                 if (blender) {
                     keyframes[3][i].value = rot.x;
                     keyframes[4][i].value = -rot.z;
@@ -279,8 +279,8 @@ public class BVHAnimationLoader : MonoBehaviour {
                 rootBone = transform;
                 break;
             }
-            foreach (Transform child in transform.GetChildren()) {
-                transforms.Enqueue(child);
+            for (int i = 0; i < transform.childCount; i++) {
+                transforms.Enqueue(transform.GetChild(i));
             }
         }
         if (rootBone == null) {

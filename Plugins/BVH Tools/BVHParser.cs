@@ -23,8 +23,6 @@ public class BVHParser {
         public BVHChannel[] channels;
 
         private BVHParser bp;
-        private int frames = 0;
-        private float frameTime = 1000f / 24f;
 
         // 0 = Xpos, 1 = Ypos, 2 = Zpos, 3 = Xrot, 4 = Yrot, 5 = Zrot
         public struct BVHChannel {
@@ -104,17 +102,6 @@ public class BVHParser {
                         break;
                 }
             } while (peek != '}');
-        }
-
-        public void setInfo(int frames, float frameTime) {
-            for (int i = 0; i < channels.Length; i++) {
-                if (channels[i].enabled) {
-                    channels[i].values = new float[frames];
-                }
-            }
-            foreach (BVHBone child in children) {
-                child.setInfo(frames, frameTime);
-            }
         }
     }
 
@@ -375,8 +362,6 @@ public class BVHParser {
         if (overrideFrameTime) {
             frameTime = time;
         }
-
-        root.setInfo(frames, frameTime);
 
         // Prepare channels
         int totalChannels = 0;
