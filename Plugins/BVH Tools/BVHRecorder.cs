@@ -10,7 +10,7 @@ using UnityEngine;
 public class BVHRecorder : MonoBehaviour {
     [Header("Recorder settings")]
     [Tooltip("The bone rotations will be recorded every frame time milliseconds. Bone locations are recorded when this script starts running or genHierarchy() is called.")]
-    public float frameTime = 1000.0f / 24.0f;
+    public float frameTime = 1000.0f / 60.0f;
     [Tooltip("This is the filename to which the BVH file will be saved. If no filename is given, a random one will be generated when the script starts running.")]
     public string filename;
     [Tooltip("When this option is set, the BVH file will have the Z axis as up and the Y axis as forward instead of the normal BVH conventions.")]
@@ -100,8 +100,6 @@ public class BVHRecorder : MonoBehaviour {
         List<Component> meshes = new List<Component>(avatar.GetComponents<SkinnedMeshRenderer>());
         meshes.AddRange(avatar.GetComponentsInChildren<SkinnedMeshRenderer>(true));
 
-        HashSet<Transform> boneSet = new HashSet<Transform>();
-
         Transform root = null;
         foreach (SkinnedMeshRenderer smr in meshes) {
             if (root == null && smr.bones.Length > 0) {
@@ -157,10 +155,9 @@ public class BVHRecorder : MonoBehaviour {
     // This function removes empty entries from the bone list, in case the user deleted some that were misdetected
     public void cleanupBones() {
         List<Transform> clean = new List<Transform>();
-        int i = 0;
-        for (int j = 0; j < bones.Count; j++) {
-            if (bones[j] != null) {
-                clean.Add(bones[j]);
+        for (int i = 0; i < bones.Count; i++) {
+            if (bones[i] != null) {
+                clean.Add(bones[i]);
             }
         }
         bones = clean;
@@ -254,13 +251,13 @@ public class BVHRecorder : MonoBehaviour {
     Vector3 manualEuler(float a, float b, float c, float d, float e) {
         Vector3 euler = new Vector3();
         euler.z = Mathf.Atan2(a, b) * Mathf.Rad2Deg; // Z
-        euler.x = Mathf.Asin(c) * Mathf.Rad2Deg;     // Y
+        euler.x = Mathf.Asin(Mathf.Clamp(c, -1f, 1f)) * Mathf.Rad2Deg;     // Y
         euler.y = Mathf.Atan2(d, e) * Mathf.Rad2Deg; // X
         return euler;
     }
 
     // Unity to BVH
-    Vector3 eulerZXY(Quaternion q) {
+    Vector3 eulerZXY(Vector4 q) {
         return manualEuler(-2 * (q.x * q.y - q.w * q.z),
                       q.w * q.w - q.x * q.x + q.y * q.y - q.z * q.z,
                       2 * (q.y * q.z + q.w * q.x),
@@ -270,9 +267,9 @@ public class BVHRecorder : MonoBehaviour {
 
 
     private string getRotation(Quaternion rot) {
-        Quaternion rot2 = new Quaternion(rot.x, -rot.y, -rot.z, rot.w);
+        Vector4 rot2 = new Vector4(rot.x, -rot.y, -rot.z, rot.w).normalized;
         if (blender) {
-            rot2 = new Quaternion(rot.x, rot.z, -rot.y, rot.w);
+            rot2 = new Vector4(rot.x, rot.z, -rot.y, rot.w).normalized;
         }
         Vector3 angles = eulerZXY(rot2);
         // This does convert to XZY order, but it should be ZXY?

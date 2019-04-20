@@ -14,7 +14,7 @@ public class BVHAnimationLoader : MonoBehaviour {
     [Tooltip("When this option is set, the BVH file will be assumed to have the Z axis as up and the Y axis as forward instead of the normal BVH conventions.")]
     public bool blender = true;
     [Tooltip("The frame time is the number of milliseconds per frame.")]
-    public float frameTime = 1000f / 24f;
+    public float frameTime = 1000f / 60f;
     [Tooltip("This is the name that will be set on the animation clip. Leaving this empty is also okay.")]
     public string clipName;
     [Header("Advanced settings")]
@@ -35,9 +35,9 @@ public class BVHAnimationLoader : MonoBehaviour {
     [Tooltip("This field can be used to read out the the animation clip after being loaded. A new clip will always be created when loading.")]
     public AnimationClip clip;
 
+    static private int clipCount = 0;
     private Transform rootBone;
     private string prefix;
-    private Bvh bvh;
     private int frames;
     private Dictionary<string, string> pathToBone;
     private Dictionary<string, string[]> boneToMuscles;
@@ -108,17 +108,18 @@ public class BVHAnimationLoader : MonoBehaviour {
         throw new InvalidOperationException("Could not find bone \"" + name + "\" under bone \"" + transform.name + "\".");
     }
 
-    private void getCurves(string path, BvhNode node, Transform bone, bool first) {
+    private void getCurves(string path, BVHParser.BVHBone node, Transform bone, bool first) {
         bool posX = false;
         bool posY = false;
         bool posZ = false;
         bool rotX = false;
         bool rotY = false;
         bool rotZ = false;
-        
-        Keyframe[][] keyframes = new Keyframe[6][];
-        string[] props = new string[6];
-        Transform nodeTransform = getBoneByName(node.Name, bone, first);
+
+        float[][] values = new float[6][];
+        Keyframe[][] keyframes = new Keyframe[7][];
+        string[] props = new string[7];
+        Transform nodeTransform = getBoneByName(node.name, bone, first);
 
         if (path != prefix) {
             path += "/";
@@ -128,88 +129,115 @@ public class BVHAnimationLoader : MonoBehaviour {
         }
 
         // This needs to be changed to gather from all channels into two vector3, invert the coordinate system transformation and then make keyframes from it
-        foreach (Channel channel in node.Channels) {
-            ChannelCurve nodeChannel = bvh.GetChannel(node, channel);
-            if (nodeChannel.Keys.Length != frames) {
+        for (int channel = 0; channel < 6; channel++) {
+            if (!node.channels[channel].enabled) {
                 continue;
             }
 
-            int k = -1;
             switch (channel) {
-                case Channel.Xposition:
+                case 0:
                     posX = true;
-                    k = 0;
+                    props[channel] = "localPosition.x";
                     break;
-                case Channel.Yposition:
+                case 1:
                     posY = true;
-                    k = 1;
+                    props[channel] = "localPosition.y";
                     break;
-                case Channel.Zposition:
+                case 2:
                     posZ = true;
-                    k = 2;
+                    props[channel] = "localPosition.z";
                     break;
-                case Channel.Xrotation:
+                case 3:
                     rotX = true;
-                    k = 3;
+                    props[channel] = "localEulerAnglesBaked.x";
+                    props[channel] = "localRotation.x";
                     break;
-                case Channel.Yrotation:
+                case 4:
                     rotY = true;
-                    k = 4;
+                    props[channel] = "localEulerAnglesBaked.y";
+                    props[channel] = "localRotation.y";
                     break;
-                case Channel.Zrotation:
+                case 5:
                     rotZ = true;
-                    k = 5;
+                    props[channel] = "localEulerAnglesBaked.z";
+                    props[channel] = "localRotation.z";
+                    break;
+                default:
+                    channel = -1;
                     break;
             }
-            if (k == -1) {
+            if (channel == -1) {
                 continue;
             }
-            props[k] = ChannelExtensions.ToProperty(channel);
 
-            int i = 0;
-            float time = 0;
-            keyframes[k] = new Keyframe[frames];
-            foreach (float keyValue in nodeChannel.Keys) {
-                keyframes[k][i++] = new Keyframe(time, keyValue);
-                time += frameTime / 1000f;
+            keyframes[channel] = new Keyframe[frames];
+            values[channel] = node.channels[channel].values;
+            if (rotX && rotY && rotZ && keyframes[6] == null) {
+                keyframes[6] = new Keyframe[frames];
+                props[6] = "localRotation.w";
             }
         }
 
+        float time = 0f;
         if (posX && posY && posZ) {
             for (int i = 0; i < frames; i++) {
-                Vector3 posBVH = new Vector3(keyframes[0][i].value, keyframes[1][i].value, keyframes[2][i].value);
-                Vector3 pos = new Vector3(-posBVH.x, posBVH.y, posBVH.z);
+                time += frameTime / 1000f;
+                keyframes[0][i].time = time;
+                keyframes[1][i].time = time;
+                keyframes[2][i].time = time;
                 if (blender) {
-                    pos = new Vector3(-posBVH.x, posBVH.z, -posBVH.y);
+                    keyframes[0][i].value = -values[0][i];
+                    keyframes[1][i].value = values[2][i];
+                    keyframes[2][i].value = -values[1][i];
+                } else {
+                    keyframes[0][i].value = -values[0][i];
+                    keyframes[1][i].value = values[1][i];
+                    keyframes[2][i].value = values[2][i];
                 }
-                keyframes[0][i].value = pos.x;
-                keyframes[1][i].value = pos.y;
-                keyframes[2][i].value = pos.z;
             }
             clip.SetCurve(path, typeof(Transform), props[0], new AnimationCurve(keyframes[0]));
             clip.SetCurve(path, typeof(Transform), props[1], new AnimationCurve(keyframes[1]));
             clip.SetCurve(path, typeof(Transform), props[2], new AnimationCurve(keyframes[2]));
         }
 
+        time = 0f;
         if (rotX && rotY && rotZ) { 
             for (int i = 0; i < frames; i++) {
-                Vector3 eulerBVH = new Vector3(keyframes[3][i].value, keyframes[4][i].value, keyframes[5][i].value);
+                Vector3 eulerBVH = new Vector3(wrapAngle(values[3][i]), wrapAngle(values[4][i]), wrapAngle(values[5][i]));
                 Quaternion rot = fromEulerZXY(eulerBVH);
-                Quaternion rot2 = new Quaternion(rot.x, -rot.y, -rot.z, rot.w);
+                Quaternion rot2;
                 if (blender) {
-                    rot2 = new Quaternion(rot.x, -rot.z, rot.y, rot.w);
+                    keyframes[3][i].value = rot.x;
+                    keyframes[4][i].value = -rot.z;
+                    keyframes[5][i].value = rot.y;
+                    keyframes[6][i].value = rot.w;
+                    //rot2 = new Quaternion(rot.x, -rot.z, rot.y, rot.w);
+                } else {
+                    keyframes[3][i].value = rot.x;
+                    keyframes[4][i].value = -rot.y;
+                    keyframes[5][i].value = -rot.z;
+                    keyframes[6][i].value = rot.w;
+                    //rot2 = new Quaternion(rot.x, -rot.y, -rot.z, rot.w);
                 }
-                Vector3 euler = rot2.eulerAngles;
+                /*Vector3 euler = rot2.eulerAngles;
+
                 keyframes[3][i].value = wrapAngle(euler.x);
                 keyframes[4][i].value = wrapAngle(euler.y);
-                keyframes[5][i].value = wrapAngle(euler.z);
+                keyframes[5][i].value = wrapAngle(euler.z);*/
+
+                time += frameTime / 1000f;
+                keyframes[3][i].time = time;
+                keyframes[4][i].time = time;
+                keyframes[5][i].time = time;
+                keyframes[6][i].time = time;
             }
             clip.SetCurve(path, typeof(Transform), props[3], new AnimationCurve(keyframes[3]));
             clip.SetCurve(path, typeof(Transform), props[4], new AnimationCurve(keyframes[4]));
             clip.SetCurve(path, typeof(Transform), props[5], new AnimationCurve(keyframes[5]));
+            clip.SetCurve(path, typeof(Transform), props[6], new AnimationCurve(keyframes[6]));
         }
 
-        foreach (BvhNode child in node.Children) {
+        foreach (BVHParser.BVHBone child in node.children) {
             getCurves(path, child, nodeTransform, false);
         }
     }
@@ -242,13 +270,13 @@ public class BVHAnimationLoader : MonoBehaviour {
             throw new InvalidOperationException("No target avatar set.");
         }
 
-        bvh = Bvh.Parse(bvhData);
+        BVHParser bp = new BVHParser(bvhData, frameTime);
 
         Queue<Transform> transforms = new Queue<Transform>();
         transforms.Enqueue(targetAvatar.transform);
         while (transforms.Any()) {
             Transform transform = transforms.Dequeue();
-            if (flexibleName(transform.name) == flexibleName(bvh.Root.Name)) {
+            if (flexibleName(transform.name) == flexibleName(bp.root.name)) {
                 rootBone = transform;
                 break;
             }
@@ -261,7 +289,7 @@ public class BVHAnimationLoader : MonoBehaviour {
             Debug.LogWarning("Using \"" + rootBone.name + "\" as the root bone.");
         }
         if (rootBone == null) {
-            throw new InvalidOperationException("No root bone \"" + bvh.Root.Name + "\" found." );
+            throw new InvalidOperationException("No root bone \"" + bp.root.name + "\" found." );
         }
 
         renamingMap = new Dictionary<string, string>();
@@ -271,16 +299,17 @@ public class BVHAnimationLoader : MonoBehaviour {
             }
         }
 
-        frames = bvh.FrameCount;
+        frames = bp.frames;
         clip = new AnimationClip();
-        clip.name = "BVHClip (" + System.Guid.NewGuid() + ")";
+        clip.name = "BVHClip (" + (clipCount++) + ")";
         if (clipName != "") {
             clip.name = clipName;
         }
         clip.legacy = true;
         prefix = getPathBetween(rootBone, targetAvatar.transform, true, true);
 
-        getCurves(prefix, bvh.Root, rootBone, true);
+        getCurves(prefix, bp.root, rootBone, true);
+        clip.EnsureQuaternionContinuity();
         if (anim == null) {
             anim = targetAvatar.gameObject.GetComponent<Animation>();
             if (anim == null) {

@@ -1,22 +1,14 @@
-﻿BVH Tools for Unity/VRM
-=======================
+﻿BVH Tools for Unity
+===================
 
 This package provides a component to record motion data of VRM avatars in BVH
 format files. A second component allows loading such files as (legacy)
 animation clips back into Unity.
 
-Other than depending on one script from UniVRM, this should actually work
-with non-VRM avatars too.
-
-## Requirements
-
-The animation loader depends on the Bvh.cs file from UniVRM, so make sure you
-have [UniVRM](https://github.com/dwango/UniVRM) in your Unity project.
-
 ## Recording
 
 The most simple way to get started is to attach the "BVH Recorder" component
-to a VRM avatar. Set the "Target Avatar" field to refer to the avatar, and set
+to an avatar. Set the "Target Avatar" field to refer to the avatar, and set
 a filename and path for the BVH file. Then play the scene and check the
 "Capturing" box. You can uncheck and check it as you like. Captured motion data
 will be added at the end. Once you are happy with your motion data, press the
@@ -62,6 +54,6 @@ This software is distributed under the terms of the MIT license.
 
 ## About
 
-BVH Tools was made by [Emiliana](https://twitter.com/emiliana_vt) for
-Virtual YouTuber purposes, but it can also be used for games or other
+BVH Tools for Unity was made by [Emiliana](https://twitter.com/emiliana_vt)
+for Virtual YouTuber purposes, but it can also be used for games or other
 applications.
