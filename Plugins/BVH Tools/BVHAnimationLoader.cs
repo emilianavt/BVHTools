@@ -1,9 +1,8 @@
 ﻿using System;
+using System.IO;
 using System.Linq;
 using System.Collections.Generic;
 using UnityEngine;
-using UniHumanoid;
-using System.IO;
 
 public class BVHAnimationLoader : MonoBehaviour {
     [Header("Loader settings")]
