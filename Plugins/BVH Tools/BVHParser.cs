@@ -10,6 +10,7 @@ public class BVHParser {
     public BVHBone root;
     private List<BVHBone> boneList;
 
+    static private char[] charMap = null;
     private float[][] channels;
     private string bvhText;
     private int pos = 0;
@@ -116,9 +117,10 @@ public class BVHParser {
 
     private bool expect(string text) {
         foreach (char c in text) {
-            if (pos >= bvhText.Length || c != bvhText[pos++]) {
+            if (pos >= bvhText.Length || (c != bvhText[pos] && bvhText[pos] < 256 && c != charMap[bvhText[pos]])) {
                 return false;
             }
+            pos++;
         }
         return true;
     }
@@ -139,12 +141,15 @@ public class BVHParser {
             return false;
         }
         switch (bvhText[pos]) {
+            case 'x':
             case 'X':
                 channel = 0;
                 break;
+            case 'y':
             case 'Y':
                 channel = 1;
                 break;
+            case 'z':
             case 'Z':
                 channel = 2;
                 break;
@@ -154,9 +159,11 @@ public class BVHParser {
         pos++;
         switch (bvhText[pos]) {
             case 'p':
+            case 'P':
                 pos++;
                 return expect("osition");
             case 'r':
+            case 'R':
                 pos++;
                 channel += 3;
                 return expect("otation");
@@ -216,7 +223,7 @@ public class BVHParser {
         }
 
         // Read decimal point
-        if (pos < bvhText.Length && bvhText[pos] == '.') {
+        if (pos < bvhText.Length && (bvhText[pos] == '.' || bvhText[pos] == ',')) {
             pos++;
 
             // Read digits after decimal
@@ -264,11 +271,11 @@ public class BVHParser {
         if (!result) {
             string errorRegion = "";
             for (int i = Math.Max(0, pos - 15); i < Math.Min(bvhText.Length, pos + 15); i++) {
-                if (i == pos - 2) {
+                if (i == pos - 1) {
                     errorRegion += ">>>";
                 }
                 errorRegion += bvhText[i];
-                if (i == pos) {
+                if (i == pos + 1) {
                     errorRegion += "<<<";
                 }
             }
@@ -340,6 +347,20 @@ public class BVHParser {
     }*/
 
     private void parse(bool overrideFrameTime, float time) {
+        // Prepare character table
+        if (charMap == null) {
+            charMap = new char[256];
+            for (int i = 0; i < 256; i++) {
+                if (i >= 'a' && i <= 'z') {
+                    charMap[i] = (char)(i - 'a' + 'A');
+                } else if (i == '\t' || i == '\n' || i == '\r') {
+                    charMap[i] = ' ';
+                } else {
+                    charMap[i] = (char)i;
+                }
+            }
+        }
+
         // Parse skeleton
         skip();
         assureExpect("HIERARCHY");
@@ -351,11 +372,11 @@ public class BVHParser {
         skip();
         assureExpect("MOTION");
         skip();
-        assureExpect("Frames:");
+        assureExpect("FRAMES:");
         skip();
         assure("frame number", getInt(out frames));
         skip();
-        assureExpect("Frame Time:");
+        assureExpect("FRAME TIME:");
         skip();
         assure("frame time", getFloat(out frameTime));
 
@@ -372,7 +393,8 @@ public class BVHParser {
         channels = new float[totalChannels][];
         foreach (BVHBone bone in boneList) {
             for (int i = 0; i < bone.channelNumber; i++) {
-                channels[channel++] = bone.channels[bone.channelOrder[i]].values;
+                channels[channel] = new float[frames];
+                bone.channels[bone.channelOrder[i]].values = channels[channel++];
             }
         }
         
@@ -381,6 +403,9 @@ public class BVHParser {
             newline();
             for (channel = 0; channel < totalChannels; channel++) {
                 skipInLine();
+                if (channels == null) throw new InvalidOperationException("Channels uninited.");
+                if (channels[channel] == null) throw new InvalidOperationException("Channel " + channel + " not found");
+                if (channels[channel].Length <= i) throw new InvalidOperationException("Channel " + channel + " too short: " + channels[channel].Length);
                 assure("channel value", getFloat(out channels[channel][i]));
             }
         }
