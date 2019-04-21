@@ -1,9 +1,10 @@
-﻿BVH Tools for Unity
+BVH Tools for Unity
 ===================
 
-This package provides a component to record motion data of avatars in BVH
-format files. A second component allows loading such files as (legacy)
-animation clips back into Unity.
+BVH Tools for Unity let you record and export motion data from avatars or
+skeletons to BVH files so they can be edited with Blender or other programs.
+The included animation loading component makes it possible import BVH files
+into Unity at runtime.
 
 ## Recording
 
