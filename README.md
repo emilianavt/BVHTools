@@ -1,7 +1,7 @@
 ﻿BVH Tools for Unity
 ===================
 
-This package provides a component to record motion data of VRM avatars in BVH
+This package provides a component to record motion data of avatars in BVH
 format files. A second component allows loading such files as (legacy)
 animation clips back into Unity.
 
