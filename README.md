@@ -192,31 +192,31 @@ bones to standard Unity humanoid bone names.
 
 Here is a short example of how you could start the capturing process:
 
-	BVHRecorder recorder = gameObject.AddComponent<BVHRecorder>();
-	recorder.targetAvatar = GetComponent<Animator>();
-	recorder.scripted = true;
+    BVHRecorder recorder = gameObject.AddComponent<BVHRecorder>();
+    recorder.targetAvatar = GetComponent<Animator>();
+    recorder.scripted = true;
     recorder.getBones();
-	recorder.buildSkeleton();
-	recorder.genHierarchy();
-	recorder.capturing = true;
+    recorder.buildSkeleton();
+    recorder.genHierarchy();
+    recorder.capturing = true;
 
 Then, after you are done capturing your animation, you save it to a file:
 
     recorder.capturing = false;
-	recorder.filename = "motion.bvh";
-	recorder.saveBVH();
+    recorder.filename = "motion.bvh";
+    recorder.saveBVH();
 
 If you want to capture another animation, just clear out the collected data.
 You can also skip this, if you want to add to your current animation.
 
-	recorder.clearCapture();
-	recorder.capturing = true;
+    recorder.clearCapture();
+    recorder.capturing = true;
 
 And save it again:
 
     recorder.capturing = false;
-	recorder.filename = "motion2.bvh";
-	recorder.saveBVH();
+    recorder.filename = "motion2.bvh";
+    recorder.saveBVH();
 
 ### BVHAnimationLoader
 
@@ -338,23 +338,23 @@ one of the parsing functions and this function in sequence multiple times.
 
 For example:
 
-	BVHAnimationLoader loader = gameObject.AddComponent<BVHAnimationLoader>();
-	loader.targetAvatar = GetComponent<Animator>();
-	loader.clipName = "anim1";
+    BVHAnimationLoader loader = gameObject.AddComponent<BVHAnimationLoader>();
+    loader.targetAvatar = GetComponent<Animator>();
+    loader.clipName = "anim1";
     loader.filename = "anim1.bvh";
-	loader.parseFile();
-	loader.loadAnimation();
+    loader.parseFile();
+    loader.loadAnimation();
     
-	loader.clipName = "anim2";
+    loader.clipName = "anim2";
     loader.filename = "anim2.bvh";
-	loader.parseFile();
-	loader.loadAnimation();
-	
-	loader.clipName = "anim3";
+    loader.parseFile();
+    loader.loadAnimation();
+    
+    loader.clipName = "anim3";
     loader.filename = "anim3.bvh";
-	loader.parseFile();
-	loader.loadAnimation();
+    loader.parseFile();
+    loader.loadAnimation();
 
 The loaded animations can then be played through the `Animation` component:
 
-	loader.anim.Play("anim2");
+    loader.anim.Play("anim2");
