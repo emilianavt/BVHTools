@@ -12,7 +12,8 @@ public class BVHAnimationLoaderEditor : Editor {
         BVHAnimationLoader bvhLoader = (BVHAnimationLoader)target;
 
         if (GUILayout.Button("Load animation")) {
-            bvhLoader.loadAnimation(File.ReadAllText(bvhLoader.bvhFile));
+            bvhLoader.parseFile();
+            bvhLoader.loadAnimation();
             Debug.Log("Loading animation done.");
         }
 

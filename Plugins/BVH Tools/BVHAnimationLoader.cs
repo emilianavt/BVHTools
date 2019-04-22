@@ -9,11 +9,13 @@ public class BVHAnimationLoader : MonoBehaviour {
     [Tooltip("This is the target avatar for which the animation should be loaded. Bone names should be identical to those in the BVH file and unique. All bones should be initialized with zero rotations. This is usually the case for VRM avatars.")]
     public Animator targetAvatar;
     [Tooltip("This is the path to the BVH file that should be loaded. Bone offsets are currently being ignored by this loader.")]
-    public string bvhFile;
+    public string filename;
     [Tooltip("When this option is set, the BVH file will be assumed to have the Z axis as up and the Y axis as forward instead of the normal BVH conventions.")]
     public bool blender = true;
     [Tooltip("The frame time is the number of milliseconds per frame.")]
     public float frameTime = 1000f / 60f;
+    [Tooltip("When this flag is set, the frame time in the BVH time will be used instead of the one given above.")]
+    public bool respectBVHTime = true;
     [Tooltip("This is the name that will be set on the animation clip. Leaving this empty is also okay.")]
     public string clipName;
     [Header("Advanced settings")]
@@ -35,6 +37,7 @@ public class BVHAnimationLoader : MonoBehaviour {
     public AnimationClip clip;
 
     static private int clipCount = 0;
+    private BVHParser bp = null;
     private Transform rootBone;
     private string prefix;
     private int frames;
@@ -50,7 +53,7 @@ public class BVHAnimationLoader : MonoBehaviour {
     }
 
     // BVH to Unity
-    Quaternion fromEulerZXY(Vector3 euler) {
+    private Quaternion fromEulerZXY(Vector3 euler) {
         return Quaternion.AngleAxis(euler.z, Vector3.forward) * Quaternion.AngleAxis(euler.x, Vector3.right) * Quaternion.AngleAxis(euler.y, Vector3.up);
     }
 
@@ -264,12 +267,13 @@ public class BVHAnimationLoader : MonoBehaviour {
         throw new InvalidOperationException("No path between transforms " + target.name + " and " + root.name + " found.");
     }
 
-	public void loadAnimation(string bvhData) {
+	public void loadAnimation() {
         if (targetAvatar == null) {
             throw new InvalidOperationException("No target avatar set.");
         }
-
-        BVHParser bp = new BVHParser(bvhData, frameTime);
+        if (bp == null) {
+            throw new InvalidOperationException("No BVH file has been parsed.");
+        }
 
         Queue<Transform> transforms = new Queue<Transform>();
         transforms.Enqueue(targetAvatar.transform);
@@ -323,9 +327,27 @@ public class BVHAnimationLoader : MonoBehaviour {
         }
     }
 
+    // This function doesn't call any Unity API functions and should be safe to call from another thread
+    public void parse(string bvhData) {
+        if (respectBVHTime) {
+            bp = new BVHParser(bvhData);
+            frameTime = bp.frameTime * 1000f;
+        } else {
+            bp = new BVHParser(bvhData, frameTime);
+        }
+    }
+
+    // This function doesn't call any Unity API functions and should be safe to call from another thread
+    public void parseFile() {
+        parse(File.ReadAllText(filename));
+    }
+
     public void playAnimation() {
+        if (bp == null) {
+            throw new InvalidOperationException("No BVH file has been parsed.");
+        }
         if (clip == null) {
-            loadAnimation(File.ReadAllText(bvhFile));
+            loadAnimation();
         }
         anim.Play(clip.name);
     }
@@ -341,7 +363,8 @@ public class BVHAnimationLoader : MonoBehaviour {
     void Start () {
         if (autoStart) {
             autoPlay = true;
-            loadAnimation(File.ReadAllText(bvhFile));
+            parseFile();
+            loadAnimation();
         }
     }
 }

@@ -24,8 +24,8 @@ public class BVHRecorder : MonoBehaviour {
     public bool renameBones = false;
     [Tooltip("When this is enabled, after a drop in frame rate, multiple frames may be recorded in quick succession. When it is disabled, at least frame time milliseconds will pass before the next frame is recorded. Enabling it will help ensure that your recorded clip has the correct duration.")]
     public bool catchUp = true;
-    [Tooltip("Coordinates are recorded with six decimals. If you require a BVH file where only two decimals are required, you can turn this on.")]
-    public bool lowPrecision = false;
+    //[Tooltip("Coordinates are recorded with six decimals. If you require a BVH file where only two decimals are required, you can turn this on.")]
+    //public bool lowPrecision = false;
     [Tooltip("This should be checked when BVHRecorder is used through its API. It will disable its Start() and Update() functions. If you don't know what this means, just leave it unticked.")]
     public bool scripted = false;
 
@@ -37,6 +37,7 @@ public class BVHRecorder : MonoBehaviour {
     [Tooltip("This list contains all the bones for which motion will be recorded. If nothing is assigned, it will be automatically generated when the script starts. When manually setting up an avatar the Unity Editor, you can press the corresponding button at the bottom of this component to automatically populate the list and add or remove bones manually if necessary.")]
     public List<Transform> bones;
 
+    private bool lowPrecision = false;
     private SkelTree skel = null;
     private List<SkelTree> boneOrder = null;
     private string hierarchy;
@@ -96,7 +97,7 @@ public class BVHRecorder : MonoBehaviour {
         targetAvatar.runtimeAnimatorController = rac;
     }
 
-    public static Transform getRootBone (Animator avatar) {;
+    public static Transform getRootBone (Animator avatar) {
         List<Component> meshes = new List<Component>(avatar.GetComponents<SkinnedMeshRenderer>());
         meshes.AddRange(avatar.GetComponentsInChildren<SkinnedMeshRenderer>(true));
 
@@ -402,12 +403,12 @@ public class BVHRecorder : MonoBehaviour {
 
         if (filename == "") {
             // If no filename is set, make one up
-            filename = Application.persistentDataPath + "/" + System.Guid.NewGuid() + ".bvh";
+            filename = Application.persistentDataPath + "/motion-" + System.Guid.NewGuid() + ".bvh";
         }
 	}
 	
 	void LateUpdate () {
-        if (scripted || frames == null || hierarchy == "" || !capturing) {
+        if (frames == null || hierarchy == "" || !capturing) {
             lastFrame = Time.time;
             first = true;
             return;
