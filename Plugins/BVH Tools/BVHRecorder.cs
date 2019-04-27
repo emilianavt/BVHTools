@@ -421,8 +421,6 @@ public class BVHRecorder : MonoBehaviour {
             }
             captureFrame();
             first = false;
-            if (frames.Count == 582) { capturing = false; }
-            //capturing = false;
         }
 	}
 }

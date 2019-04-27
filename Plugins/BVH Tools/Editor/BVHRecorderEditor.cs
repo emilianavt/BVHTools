@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using UnityEditor;
+using System;
 
 [CustomEditor(typeof(BVHRecorder))]
 public class BVHRecorderEditor : Editor {
@@ -26,8 +27,8 @@ public class BVHRecorderEditor : Editor {
         if (GUILayout.Button("Save motion to BVH file")) {
             try {
                 bvhRecorder.saveBVH();
-            } catch {
-                Debug.LogError("Motion data can only be saved while the scene is running.");
+            } catch (Exception ex) {
+                Debug.LogError("An error has occurred while saving the BVH file: " + ex);
             }
         }
     }

@@ -403,9 +403,6 @@ public class BVHParser {
             newline();
             for (channel = 0; channel < totalChannels; channel++) {
                 skipInLine();
-                if (channels == null) throw new InvalidOperationException("Channels uninited.");
-                if (channels[channel] == null) throw new InvalidOperationException("Channel " + channel + " not found");
-                if (channels[channel].Length <= i) throw new InvalidOperationException("Channel " + channel + " too short: " + channels[channel].Length);
                 assure("channel value", getFloat(out channels[channel][i]));
             }
         }
