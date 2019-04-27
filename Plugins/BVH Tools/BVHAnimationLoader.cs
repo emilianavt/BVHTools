@@ -12,10 +12,10 @@ public class BVHAnimationLoader : MonoBehaviour {
     public string filename;
     [Tooltip("When this option is set, the BVH file will be assumed to have the Z axis as up and the Y axis as forward instead of the normal BVH conventions.")]
     public bool blender = true;
-    [Tooltip("The frame time is the number of milliseconds per frame.")]
-    public float frameTime = 1000f / 60f;
     [Tooltip("When this flag is set, the frame time in the BVH time will be used instead of the one given above.")]
     public bool respectBVHTime = true;
+    [Tooltip("If the flag above is disabled, the frame rate given in the BVH file will be overridden by this value.")]
+    public float frameRate = 60.0f;
     [Tooltip("This is the name that will be set on the animation clip. Leaving this empty is also okay.")]
     public string clipName;
     [Header("Advanced settings")]
@@ -78,18 +78,9 @@ public class BVHAnimationLoader : MonoBehaviour {
     }
 
     private Transform getBoneByName(string name, Transform transform, bool first) {
-        if (nameMap == null) {
-            if (standardBoneNames) {
-                Dictionary<Transform, string> boneMap;
-                BVHRecorder.populateBoneMap(out boneMap, targetAvatar);
-                nameMap = boneMap.ToDictionary(kp => flexibleName(kp.Value), kp => kp.Key);
-            } else {
-                nameMap = new Dictionary<string, Transform>();
-            }
-        }
         string targetName = flexibleName(name);
         if (renamingMap.ContainsKey(targetName)) {
-            targetName = renamingMap[targetName];
+            targetName = flexibleName(renamingMap[targetName]);
         }
         if (first) { 
             if (flexibleName(transform.name) == targetName) {
@@ -152,17 +143,14 @@ public class BVHAnimationLoader : MonoBehaviour {
                     break;
                 case 3:
                     rotX = true;
-                    props[channel] = "localEulerAnglesBaked.x";
                     props[channel] = "localRotation.x";
                     break;
                 case 4:
                     rotY = true;
-                    props[channel] = "localEulerAnglesBaked.y";
                     props[channel] = "localRotation.y";
                     break;
                 case 5:
                     rotZ = true;
-                    props[channel] = "localEulerAnglesBaked.z";
                     props[channel] = "localRotation.z";
                     break;
                 default:
@@ -184,7 +172,7 @@ public class BVHAnimationLoader : MonoBehaviour {
         float time = 0f;
         if (posX && posY && posZ) {
             for (int i = 0; i < frames; i++) {
-                time += frameTime / 1000f;
+                time += 1f / frameRate;
                 keyframes[0][i].time = time;
                 keyframes[1][i].time = time;
                 keyframes[2][i].time = time;
@@ -197,6 +185,12 @@ public class BVHAnimationLoader : MonoBehaviour {
                     keyframes[1][i].value = values[1][i];
                     keyframes[2][i].value = values[2][i];
                 }
+                if (first) {
+                    Vector3 bvhPosition = bone.transform.InverseTransformPoint(new Vector3(keyframes[0][i].value, keyframes[1][i].value, keyframes[2][i].value) + targetAvatar.transform.position);
+                    keyframes[0][i].value = bvhPosition.x;
+                    keyframes[1][i].value = bvhPosition.y;
+                    keyframes[2][i].value = bvhPosition.z;
+                }
             }
             clip.SetCurve(path, typeof(Transform), props[0], new AnimationCurve(keyframes[0]));
             clip.SetCurve(path, typeof(Transform), props[1], new AnimationCurve(keyframes[1]));
@@ -204,7 +198,8 @@ public class BVHAnimationLoader : MonoBehaviour {
         }
 
         time = 0f;
-        if (rotX && rotY && rotZ) { 
+        if (rotX && rotY && rotZ) {
+            Quaternion oldRotation = bone.transform.rotation;
             for (int i = 0; i < frames; i++) {
                 Vector3 eulerBVH = new Vector3(wrapAngle(values[3][i]), wrapAngle(values[4][i]), wrapAngle(values[5][i]));
                 Quaternion rot = fromEulerZXY(eulerBVH);
@@ -221,18 +216,26 @@ public class BVHAnimationLoader : MonoBehaviour {
                     keyframes[6][i].value = rot.w;
                     //rot2 = new Quaternion(rot.x, -rot.y, -rot.z, rot.w);
                 }
+                if (first) {
+                    bone.transform.rotation = new Quaternion(keyframes[3][i].value, keyframes[4][i].value, keyframes[5][i].value, keyframes[6][i].value);
+                    keyframes[3][i].value = bone.transform.localRotation.x;
+                    keyframes[4][i].value = bone.transform.localRotation.y;
+                    keyframes[5][i].value = bone.transform.localRotation.z;
+                    keyframes[6][i].value = bone.transform.localRotation.w;
+                }
                 /*Vector3 euler = rot2.eulerAngles;
 
                 keyframes[3][i].value = wrapAngle(euler.x);
                 keyframes[4][i].value = wrapAngle(euler.y);
                 keyframes[5][i].value = wrapAngle(euler.z);*/
 
-                time += frameTime / 1000f;
+                time += 1f / frameRate;
                 keyframes[3][i].time = time;
                 keyframes[4][i].time = time;
                 keyframes[5][i].time = time;
                 keyframes[6][i].time = time;
             }
+            bone.transform.rotation = oldRotation;
             clip.SetCurve(path, typeof(Transform), props[3], new AnimationCurve(keyframes[3]));
             clip.SetCurve(path, typeof(Transform), props[4], new AnimationCurve(keyframes[4]));
             clip.SetCurve(path, typeof(Transform), props[5], new AnimationCurve(keyframes[5]));
@@ -275,11 +278,36 @@ public class BVHAnimationLoader : MonoBehaviour {
             throw new InvalidOperationException("No BVH file has been parsed.");
         }
 
+        if (nameMap == null) {
+            if (standardBoneNames) {
+                Dictionary<Transform, string> boneMap;
+                BVHRecorder.populateBoneMap(out boneMap, targetAvatar);
+                nameMap = boneMap.ToDictionary(kp => flexibleName(kp.Value), kp => kp.Key);
+            } else {
+                nameMap = new Dictionary<string, Transform>();
+            }
+        }
+
+        renamingMap = new Dictionary<string, string>();
+        foreach (FakeDictionary entry in boneRenamingMap) {
+            if (entry.bvhName != "" && entry.targetName != "") {
+                renamingMap.Add(flexibleName(entry.bvhName), flexibleName(entry.targetName));
+            }
+        }
+
         Queue<Transform> transforms = new Queue<Transform>();
         transforms.Enqueue(targetAvatar.transform);
+        string targetName = flexibleName(bp.root.name);
+        if (renamingMap.ContainsKey(targetName)) {
+            targetName = flexibleName(renamingMap[targetName]);
+        }
         while (transforms.Any()) {
             Transform transform = transforms.Dequeue();
-            if (flexibleName(transform.name) == flexibleName(bp.root.name)) {
+            if (flexibleName(transform.name) == targetName) {
+                rootBone = transform;
+                break;
+            }
+            if (nameMap.ContainsKey(targetName) && nameMap[targetName] == transform) {
                 rootBone = transform;
                 break;
             }
@@ -293,13 +321,6 @@ public class BVHAnimationLoader : MonoBehaviour {
         }
         if (rootBone == null) {
             throw new InvalidOperationException("No root bone \"" + bp.root.name + "\" found." );
-        }
-
-        renamingMap = new Dictionary<string, string>();
-        foreach (FakeDictionary entry in boneRenamingMap) {
-            if (entry.bvhName != "" && entry.targetName != "") {
-                renamingMap.Add(flexibleName(entry.bvhName), flexibleName(entry.targetName));
-            }
         }
 
         frames = bp.frames;
@@ -331,9 +352,9 @@ public class BVHAnimationLoader : MonoBehaviour {
     public void parse(string bvhData) {
         if (respectBVHTime) {
             bp = new BVHParser(bvhData);
-            frameTime = bp.frameTime * 1000f;
+            frameRate = 1f / bp.frameTime;
         } else {
-            bp = new BVHParser(bvhData, frameTime);
+            bp = new BVHParser(bvhData, 1f / frameRate);
         }
     }
 

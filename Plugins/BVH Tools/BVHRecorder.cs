@@ -1,17 +1,22 @@
-﻿using System;
+﻿// Things to fix:
+// - Handle non-zero-rotation bones without producing a stupid rest pose
+// - Add support recording translation too
+// - Update API documentation
+
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using UnityEngine;
 
-// Something about the end result in blender is still messed up. Lowering my arms is fine, but raising them doesn't work??
-
 public class BVHRecorder : MonoBehaviour {
     [Header("Recorder settings")]
-    [Tooltip("The bone rotations will be recorded every frame time milliseconds. Bone locations are recorded when this script starts running or genHierarchy() is called.")]
-    public float frameTime = 1000.0f / 60.0f;
-    [Tooltip("This is the filename to which the BVH file will be saved. If no filename is given, a random one will be generated when the script starts running.")]
+    [Tooltip("The bone rotations will be recorded this many times per second. Bone locations are recorded when this script starts running or genHierarchy() is called.")]
+    public float frameRate = 60.0f;
+    [Tooltip("This is the directory into which BVH files are written. If left empty, it will be initialized to the standard Unity persistant data path, unless the filename field contains a slash or a backslash, in which case this field will be ignored completely instead.")]
+    public string directory;
+    [Tooltip("This is the filename to which the BVH file will be saved. If no filename is given, a new one will be generated based on a timestamp. If the file already exists, a number will be appended.")]
     public string filename;
     [Tooltip("When this option is set, the BVH file will have the Z axis as up and the Y axis as forward instead of the normal BVH conventions.")]
     public bool blender = true;
@@ -37,6 +42,13 @@ public class BVHRecorder : MonoBehaviour {
     [Tooltip("This list contains all the bones for which motion will be recorded. If nothing is assigned, it will be automatically generated when the script starts. When manually setting up an avatar the Unity Editor, you can press the corresponding button at the bottom of this component to automatically populate the list and add or remove bones manually if necessary.")]
     public List<Transform> bones;
 
+    [Header("Informational")]
+    [Tooltip("This field shows how many frames are currently captured. Clearing the capture will reset this to 0.")]
+    public int frameNumber = 0;
+    [Tooltip("This field will be set to the filename written to by the saveBVH() function.")]
+    public string lastSavedFile = "";
+
+    private Vector3 basePosition;
     private bool lowPrecision = false;
     private SkelTree skel = null;
     private List<SkelTree> boneOrder = null;
@@ -58,12 +70,8 @@ public class BVHRecorder : MonoBehaviour {
                 if (boneMap.ContainsKey(bone)) {
                     name = boneMap[bone];
                 } else if (boneMap.ContainsValue(name)) {
-                    //Debug.LogWarning("A non-humanoid bone was added to the skeleton: " + name);
                     name = name + "_";
                 }
-            }
-            if (bone.localRotation.eulerAngles.x < 0 || bone.localRotation.eulerAngles.x > 0 || bone.localRotation.eulerAngles.y < 0 || bone.localRotation.eulerAngles.y > 0 || bone.localRotation.eulerAngles.z < 0 || bone.localRotation.eulerAngles.z > 0) {
-                //throw new InvalidOperationException("Bone " + bone.name + " with non-zero rotation not supported.");
             }
             transform = bone;
             children = new List<SkelTree>();
@@ -97,16 +105,31 @@ public class BVHRecorder : MonoBehaviour {
         targetAvatar.runtimeAnimatorController = rac;
     }
 
-    public static Transform getRootBone (Animator avatar) {
+    public static Transform getRootBone(Animator avatar) {
+        return getRootBone(avatar, null);
+    }
+
+    public static Transform getRootBone (Animator avatar, List<Transform> bones) {
         List<Component> meshes = new List<Component>(avatar.GetComponents<SkinnedMeshRenderer>());
         meshes.AddRange(avatar.GetComponentsInChildren<SkinnedMeshRenderer>(true));
 
         Transform root = null;
-        foreach (SkinnedMeshRenderer smr in meshes) {
-            if (root == null && smr.bones.Length > 0) {
-                root = smr.bones[0];
+        if (bones == null) {
+            foreach (SkinnedMeshRenderer smr in meshes) {
+                if (root == null && smr.bones.Length > 0) {
+                    root = smr.bones[0];
+                }
+                foreach (Transform bone in smr.bones) {
+                    if (root.IsChildOf(bone) && bone != root) {
+                        root = bone;
+                    }
+                }
             }
-            foreach (Transform bone in smr.bones) {
+        } else {
+            foreach (Transform bone in bones) {
+                if (root == null) {
+                    root = bone;
+                }
                 if (root.IsChildOf(bone) && bone != root) {
                     root = bone;
                 }
@@ -126,19 +149,14 @@ public class BVHRecorder : MonoBehaviour {
             populateBoneMap(out boneMap, targetAvatar);
         }
 
-        rootBone = getRootBone(targetAvatar);
-        if (rootBone == null) {
-            throw new InvalidOperationException("No root bone found.");
-        }
-
         List<Component> meshes = new List<Component>(targetAvatar.GetComponents<SkinnedMeshRenderer>());
         meshes.AddRange(targetAvatar.GetComponentsInChildren<SkinnedMeshRenderer>(true));
         
         HashSet<Transform> boneSet = new HashSet<Transform>();
-        
+
         foreach (SkinnedMeshRenderer smr in meshes) {
             foreach (Transform bone in smr.bones) {
-                if (bone.IsChildOf(rootBone) && bone != rootBone) {
+                if (rootBone == null || (bone.IsChildOf(rootBone) && bone != rootBone)) {
                     if (enforceHumanoidBones) {
                         if (boneMap.ContainsKey(bone)) {
                             boneSet.Add(bone);
@@ -191,14 +209,14 @@ public class BVHRecorder : MonoBehaviour {
     
     // This builds a minimal tree covering all detected bones that will be used to generate the hierarchy section of the BVH file
     public void buildSkeleton() {
-        rootBone = getRootBone(targetAvatar);
-        if (rootBone == null) {
-            throw new InvalidOperationException("No root bone found.");
+        cleanupBones();
+        if (bones.Count == 0) {
+            throw new InvalidOperationException("Target avatar, root bone and the bones list have to be set before calling buildSkeleton(). You can initialize bones list by calling getBones().");
         }
 
-        cleanupBones();
-        if (bones.Count == 0 || rootBone == null) {
-            throw new InvalidOperationException("Target avatar, root bone and the bones list have to be set before calling buildSkeleton(). You can initialize bones list by calling getBones().");
+        rootBone = getRootBone(targetAvatar, bones);
+        if (rootBone == null) {
+            throw new InvalidOperationException("No root bone found.");
         }
 
         if (enforceHumanoidBones) {
@@ -206,6 +224,7 @@ public class BVHRecorder : MonoBehaviour {
         } else {
             boneMap = null;
         }
+        basePosition = targetAvatar.transform.position;
 
         HashSet<Transform> boneSet = new HashSet<Transform>(bones);
         skel = new SkelTree(rootBone, boneMap);
@@ -295,11 +314,15 @@ public class BVHRecorder : MonoBehaviour {
 
     // This function recursively generates JOINT entries for the hierarchy section of the BVH file
     private string genJoint(int level, SkelTree bone) {
-        // I thought I'd pretend to be a bone with zero rotation, but it did nothing.
         Quaternion rot = bone.transform.localRotation;
         bone.transform.localRotation = Quaternion.identity;
 
-        string result = tabs(level) + "JOINT " + bone.name + "\n" + tabs(level) + "{\n" + tabs(level) + "\tOFFSET\t" + getOffset(bone.transform.position - bone.transform.parent.position) + "\n" + tabs(level) + "\tCHANNELS 3 Zrotation Xrotation Yrotation\n";
+        Vector3 offset = bone.transform.position - bone.transform.parent.position;
+        if (bone == skel) {
+            offset = bone.transform.position - basePosition;
+        }
+
+        string result = tabs(level) + "JOINT " + bone.name + "\n" + tabs(level) + "{\n" + tabs(level) + "\tOFFSET\t" + getOffset(offset) + "\n" + tabs(level) + "\tCHANNELS 3 Zrotation Xrotation Yrotation\n";
         boneOrder.Add(bone);
 
         if (bone.children.Any()) {
@@ -323,10 +346,11 @@ public class BVHRecorder : MonoBehaviour {
             throw new InvalidOperationException("Skeleton not initialized. You can initialize the skeleton by calling buildSkeleton().");
         }
 
-        Quaternion rot = skel.transform.localRotation;
-        skel.transform.localRotation = Quaternion.identity;
+        Quaternion rot = skel.transform.rotation;
+        skel.transform.rotation = Quaternion.identity;
         boneOrder = new List<SkelTree>() { skel };
-        hierarchy = "HIERARCHY\nROOT " + skel.name + "\n{\n\tOFFSET\t0.00\t0.00\t0.00\n\tCHANNELS 6 Xposition Yposition Zposition Zrotation Xrotation Yrotation\n";
+        Vector3 rootOffset = skel.transform.position - basePosition;
+        hierarchy = "HIERARCHY\nROOT " + skel.name + "\n{\n\tOFFSET\t" + getOffset(rootOffset) + "\n\tCHANNELS 6 Xposition Yposition Zposition Zrotation Xrotation Yrotation\n";
 
         if (skel.children.Any()) {
             foreach (SkelTree child in skel.children) {
@@ -338,7 +362,7 @@ public class BVHRecorder : MonoBehaviour {
         }
 
         hierarchy += "}\n";
-        skel.transform.localRotation = rot;
+        skel.transform.rotation = rot;
 
         frames = new List<string>();
         lastFrame = Time.time;
@@ -351,18 +375,24 @@ public class BVHRecorder : MonoBehaviour {
             throw new InvalidOperationException("Hierarchy not initialized. You can initialize the hierarchy by calling genHierarchy().");
         }
 
-        string frame = getOffset(rootBone.localPosition);
+        string frame = getOffset(skel.transform.position - basePosition);
         foreach (SkelTree bone in boneOrder) {
             frame += "\t";
-            frame += getRotation(bone.transform.localRotation);
+            if (bone == skel) {
+                frame += getRotation(bone.transform.rotation);
+            } else {
+                frame += getRotation(bone.transform.localRotation);
+            }
         }
         frame += "\n";
         frames.Add(frame);
+        frameNumber++;
     }
 
     // Just what it says
     public void clearCapture() {
         frames.Clear();
+        frameNumber = 0;
     }
 
     // This file attaches frame data to the hierarchy section
@@ -372,7 +402,7 @@ public class BVHRecorder : MonoBehaviour {
         }
 
         string bvh = hierarchy;
-        bvh += "MOTION\nFrames:    " + frames.Count + "\nFrame Time: " + string.Format(CultureInfo.InvariantCulture, "{0}", frameTime / 1000f) + "\n";
+        bvh += "MOTION\nFrames:    " + frames.Count + "\nFrame Time: " + string.Format(CultureInfo.InvariantCulture, "{0}", 1f / frameRate) + "\n";
 
         foreach (string frame in frames) {
             bvh += frame;
@@ -381,13 +411,43 @@ public class BVHRecorder : MonoBehaviour {
         return bvh;
     }
 
+    public string uniquePath(string path) {
+        string dir = Path.GetDirectoryName(path);
+        string fileName = Path.GetFileNameWithoutExtension(path);
+        string fileExt = Path.GetExtension(path);
+
+        int i = 1;
+        while (File.Exists(path)) {
+            path = Path.Combine(dir, fileName + " (" + i++ + ")" + fileExt);
+        }
+        return path;
+    }
+
     // This saves  the full BVH file to the filename set in the component
     public void saveBVH() {
         if (frames == null || hierarchy == "") {
             throw new InvalidOperationException("Hierarchy not initialized. You can initialize the hierarchy by calling genHierarchy().");
         }
 
-        File.WriteAllText(filename, genBVH());
+        string outputFile = filename;
+        if (outputFile == "") {
+            // If no filename is set, make one up
+            outputFile = "motion-" + DateTime.Now.ToString("yyyyddMMHHmmss") + ".bvh";
+        } else {
+            if (!outputFile.EndsWith(".bvh", true, CultureInfo.InvariantCulture)) {
+                if (outputFile.EndsWith(".")) {
+                    outputFile = outputFile + "bvh";
+                } else {
+                    outputFile = outputFile + ".bvh";
+                }
+            }
+        }
+        if (directory == "" && !(filename.Contains("/") || filename.Contains("\\"))) {
+            directory = Application.persistentDataPath;
+        }
+        outputFile = uniquePath(Path.Combine(directory, outputFile));
+        File.WriteAllText(outputFile, genBVH());
+        lastSavedFile = outputFile;
     }
 
     void Start () {
@@ -400,11 +460,6 @@ public class BVHRecorder : MonoBehaviour {
         }
         buildSkeleton();
         genHierarchy();
-
-        if (filename == "") {
-            // If no filename is set, make one up
-            filename = Application.persistentDataPath + "/motion-" + System.Guid.NewGuid() + ".bvh";
-        }
 	}
 	
 	void LateUpdate () {
@@ -413,9 +468,9 @@ public class BVHRecorder : MonoBehaviour {
             first = true;
             return;
         }
-        if (first || 1000 * lastFrame + frameTime < 1000 * Time.time) {
+        if (first || lastFrame + 1f / frameRate <= Time.time) {
             if (catchUp) {
-                lastFrame = lastFrame + frameTime / 1000f;
+                lastFrame = lastFrame + 1f / frameRate;
             } else {
                 lastFrame = Time.time;
             }
