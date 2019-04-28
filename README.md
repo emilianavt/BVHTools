@@ -91,17 +91,25 @@ useful to only capture motion for a part of a skeleton.
 This list contains the bones for which motion data will be recorded. It can be
 filled automatically using the `getBones()` function.
 
-#### `float frameTime`
+#### `float frameRate`
 
-This is the frame duration that will be written to the BVH file. It is also
-used for timing when capturing frames by setting the `capturing` flag to true.
+This the how often bone rotations will be recorded every second, when the
+`capturing` flag is set to true. The frame duration written to the BVH file is
+also derived from this.
+
+#### `string directory`
+
+This is the directory into which BVH files are written. If left empty, it will
+be initialized to the standard Unity persistant data path, unless the filename
+field contains a slash or a backslash, in which case this field will be ignored
+completely instead.
 
 #### `string filename`
 
 This field is used by the `saveBVH()` function and specifies the filename of
-the BVH file it will create. If the file exists, it will be silently
-overwritten. If no filename is set, and `scripted` is set to false, a random
-filename will be generated.
+the BVH file it will create.  If no filename is given, a new one will be
+generated based on a timestamp. If the file already exists, a number will be
+appended.
 
 #### `bool scripted`
 
@@ -138,6 +146,15 @@ Setting this to true will allow capturing with the `capturing` flag to speed
 up after if the frame rate drops, to keep the duration of the captured
 animation correct. Disabling this flag will ensure that at least `frameTime`
 milliseconds pass after every captured frame.
+
+#### `int frameNumber` (read-only)
+
+This field shows how many frames are currently captured. Clearing the capture
+will reset this to 0.
+
+#### `string lastSavedFile` (read-only)
+
+This field will be set to the filename written to by the `saveBVH()` function.
 
 #### `void getBones()` (usually required)
 
@@ -182,6 +199,11 @@ the `filename` field.
 #### `static Transform getRootBone (Animator avatar)`
 
 This function can be used to detect the root bone of an avatar.
+
+#### `static Transform getRootBone (Animator avatar, List<Transform> bones)`
+
+This function can be used to detect the root bone of an avatar, given a set of
+bones.
 
 #### `static void populateBoneMap(out Dictionary<Transform, string> boneMap, Animator targetAvatar)`
 
@@ -241,10 +263,10 @@ Blender is part of the animation workflow, it is usually best to enable this
 option in both `BVHRecorder` and `BVHAnimationLoader`. It is also enabled by
 default.
 
-#### `float frameTime`
+#### `float frameRate`
 
-This value specifies the duration of one animation frame. It always overrides
-the setting given in the BVH file, unless `respectBVHTime` is set.
+When the flag below is set, this frame rate will override that derived from the
+frame time given in the BVH file.
 
 #### `bool respectBVHTime`
 
