@@ -111,6 +111,11 @@ the BVH file it will create.  If no filename is given, a new one will be
 generated based on a timestamp. If the file already exists, a number will be
 appended.
 
+#### `bool overwrite`
+
+When this flag is set to true, files will be overwritten. No numbers will be
+appended to filenames.
+
 #### `bool scripted`
 
 Setting this flag will prevent the automatic initialization of this
