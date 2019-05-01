@@ -18,6 +18,8 @@ public class BVHRecorder : MonoBehaviour {
     public string directory;
     [Tooltip("This is the filename to which the BVH file will be saved. If no filename is given, a new one will be generated based on a timestamp. If the file already exists, a number will be appended.")]
     public string filename;
+    [Tooltip("When this flag is set, existing files will be overwritten and no number will be appended at the end to avoid this.")]
+    public bool overwrite = false;
     [Tooltip("When this option is set, the BVH file will have the Z axis as up and the Y axis as forward instead of the normal BVH conventions.")]
     public bool blender = true;
     [Tooltip("When this box is checked, motion data will be recorded. It is possible to uncheck and check this box to pause and resume the capturing process.")]
@@ -63,7 +65,7 @@ public class BVHRecorder : MonoBehaviour {
         public String name;
         public Transform transform;
         public List<SkelTree> children;
-        
+
         public SkelTree(Transform bone, Dictionary<Transform, string> boneMap) {
             name = bone.gameObject.name;
             if (boneMap != null) {
@@ -432,7 +434,7 @@ public class BVHRecorder : MonoBehaviour {
         string outputFile = filename;
         if (outputFile == "") {
             // If no filename is set, make one up
-            outputFile = "motion-" + DateTime.Now.ToString("yyyyddMMHHmmss") + ".bvh";
+            outputFile = "motion-" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".bvh";
         } else {
             if (!outputFile.EndsWith(".bvh", true, CultureInfo.InvariantCulture)) {
                 if (outputFile.EndsWith(".")) {
@@ -445,7 +447,9 @@ public class BVHRecorder : MonoBehaviour {
         if (directory == "" && !(filename.Contains("/") || filename.Contains("\\"))) {
             directory = Application.persistentDataPath;
         }
-        outputFile = uniquePath(Path.Combine(directory, outputFile));
+        if (!overwrite) {
+            outputFile = uniquePath(Path.Combine(directory, outputFile));
+        }
         File.WriteAllText(outputFile, genBVH());
         lastSavedFile = outputFile;
     }
@@ -460,9 +464,9 @@ public class BVHRecorder : MonoBehaviour {
         }
         buildSkeleton();
         genHierarchy();
-	}
-	
-	void LateUpdate () {
+    }
+    
+    void LateUpdate () {
         if (frames == null || hierarchy == "" || !capturing) {
             lastFrame = Time.time;
             first = true;
@@ -477,5 +481,5 @@ public class BVHRecorder : MonoBehaviour {
             captureFrame();
             first = false;
         }
-	}
+    }
 }
