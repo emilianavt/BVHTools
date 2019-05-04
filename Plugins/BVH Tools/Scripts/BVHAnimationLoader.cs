@@ -198,9 +198,13 @@ public class BVHAnimationLoader : MonoBehaviour {
                     keyframes[2][i].value = bvhPosition.z;
                 }
             }
-            clip.SetCurve(path, typeof(Transform), props[0], new AnimationCurve(keyframes[0]));
-            clip.SetCurve(path, typeof(Transform), props[1], new AnimationCurve(keyframes[1]));
-            clip.SetCurve(path, typeof(Transform), props[2], new AnimationCurve(keyframes[2]));
+            if (first) {
+                clip.SetCurve(path, typeof(Transform), props[0], new AnimationCurve(keyframes[0]));
+                clip.SetCurve(path, typeof(Transform), props[1], new AnimationCurve(keyframes[1]));
+                clip.SetCurve(path, typeof(Transform), props[2], new AnimationCurve(keyframes[2]));
+            } else {
+                Debug.LogWarning("Position information on bones other than the root bone is currently not supported and has been ignored. If you exported this file from Blender, please tick the \"Root Translation Only\" option next time.");
+            }
         }
 
         time = 0f;
