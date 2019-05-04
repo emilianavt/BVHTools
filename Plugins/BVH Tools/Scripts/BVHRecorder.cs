@@ -51,7 +51,6 @@ public class BVHRecorder : MonoBehaviour {
     [Tooltip("This field will be set to the filename written to by the saveBVH() function.")]
     public string lastSavedFile = "";
 
-    private Vector3 rootOffset;
     private Vector3 basePosition;
     private bool lowPrecision = false;
     private SkelTree skel = null;
@@ -322,10 +321,6 @@ public class BVHRecorder : MonoBehaviour {
         bone.transform.localRotation = Quaternion.identity;
 
         Vector3 offset = bone.transform.position - bone.transform.parent.position;
-        if (bone == skel) {
-            offset = bone.transform.position - basePosition;
-        }
-
         string result = tabs(level) + "JOINT " + bone.name + "\n" + tabs(level) + "{\n" + tabs(level) + "\tOFFSET\t" + getOffset(offset) + "\n" + tabs(level) + "\tCHANNELS 3 Zrotation Xrotation Yrotation\n";
         boneOrder.Add(bone);
 
@@ -353,8 +348,7 @@ public class BVHRecorder : MonoBehaviour {
         Quaternion rot = skel.transform.rotation;
         skel.transform.rotation = Quaternion.identity;
         boneOrder = new List<SkelTree>() { skel };
-        rootOffset = skel.transform.position - basePosition;
-        hierarchy = "HIERARCHY\nROOT " + skel.name + "\n{\n\tOFFSET\t" + getOffset(rootOffset) + "\n\tCHANNELS 6 Xposition Yposition Zposition Zrotation Xrotation Yrotation\n";
+        hierarchy = "HIERARCHY\nROOT " + skel.name + "\n{\n\tOFFSET\t0.00\t0.00\t0.00\n\tCHANNELS 6 Xposition Yposition Zposition Zrotation Xrotation Yrotation\n";
 
         if (skel.children.Any()) {
             foreach (SkelTree child in skel.children) {
@@ -380,7 +374,7 @@ public class BVHRecorder : MonoBehaviour {
         }
 
         StringBuilder sb = new StringBuilder();
-        sb.Append(getOffset(skel.transform.position - rootOffset));
+        sb.Append(getOffset(skel.transform.position - basePosition));
         foreach (SkelTree bone in boneOrder) {
             sb.Append("\t");
             if (bone == skel) {

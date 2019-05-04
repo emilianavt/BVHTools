@@ -192,7 +192,7 @@ public class BVHAnimationLoader : MonoBehaviour {
                     keyframes[2][i].value = values[2][i];
                 }
                 if (first) {
-                    Vector3 bvhPosition = bone.transform.InverseTransformPoint(new Vector3(keyframes[0][i].value, keyframes[1][i].value, keyframes[2][i].value) + targetAvatar.transform.position + offset);
+                    Vector3 bvhPosition = bone.transform.parent.InverseTransformPoint(new Vector3(keyframes[0][i].value, keyframes[1][i].value, keyframes[2][i].value) + targetAvatar.transform.position + offset);
                     keyframes[0][i].value = bvhPosition.x;
                     keyframes[1][i].value = bvhPosition.y;
                     keyframes[2][i].value = bvhPosition.z;
@@ -342,7 +342,16 @@ public class BVHAnimationLoader : MonoBehaviour {
         clip.legacy = true;
         prefix = getPathBetween(rootBone, targetAvatar.transform, true, true);
 
+        Vector3 targetAvatarPosition = targetAvatar.transform.position;
+        Quaternion targetAvatarRotation = targetAvatar.transform.rotation;
+        targetAvatar.transform.position = new Vector3(0.0f, 0.0f, 0.0f);
+        targetAvatar.transform.rotation = Quaternion.identity;
+        
         getCurves(prefix, bp.root, rootBone, true);
+        
+        targetAvatar.transform.position = targetAvatarPosition;
+        targetAvatar.transform.rotation = targetAvatarRotation;
+        
         clip.EnsureQuaternionContinuity();
         if (anim == null) {
             anim = targetAvatar.gameObject.GetComponent<Animation>();
