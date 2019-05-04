@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
 using UnityEngine;
 
 public class BVHRecorder : MonoBehaviour {
@@ -378,17 +379,18 @@ public class BVHRecorder : MonoBehaviour {
             throw new InvalidOperationException("Hierarchy not initialized. You can initialize the hierarchy by calling genHierarchy().");
         }
 
-        string frame = getOffset(skel.transform.position - rootOffset);
+        StringBuilder sb = new StringBuilder();
+        sb.Append(getOffset(skel.transform.position - rootOffset));
         foreach (SkelTree bone in boneOrder) {
-            frame += "\t";
+            sb.Append("\t");
             if (bone == skel) {
-                frame += getRotation(bone.transform.rotation);
+                sb.Append(getRotation(bone.transform.rotation));
             } else {
-                frame += getRotation(bone.transform.localRotation);
+                sb.Append(getRotation(bone.transform.localRotation));
             }
         }
-        frame += "\n";
-        frames.Add(frame);
+        sb.Append("\n");
+        frames.Add(sb.ToString());
         frameNumber++;
     }
 
@@ -404,14 +406,15 @@ public class BVHRecorder : MonoBehaviour {
             throw new InvalidOperationException("Hierarchy not initialized. You can initialize the hierarchy by calling genHierarchy().");
         }
 
-        string bvh = hierarchy;
-        bvh += "MOTION\nFrames:    " + frames.Count + "\nFrame Time: " + string.Format(CultureInfo.InvariantCulture, "{0}", 1f / frameRate) + "\n";
+        StringBuilder bvh = new StringBuilder();
+        bvh.Append(hierarchy);
+        bvh.Append("MOTION\nFrames:    " + frames.Count + "\nFrame Time: " + string.Format(CultureInfo.InvariantCulture, "{0}", 1f / frameRate) + "\n");
 
         foreach (string frame in frames) {
-            bvh += frame;
+            bvh.Append(frame);
         }
 
-        return bvh;
+        return bvh.ToString();
     }
 
     public string uniquePath(string path) {
