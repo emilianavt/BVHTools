@@ -50,6 +50,7 @@ public class BVHRecorder : MonoBehaviour {
     [Tooltip("This field will be set to the filename written to by the saveBVH() function.")]
     public string lastSavedFile = "";
 
+    private Vector3 rootOffset;
     private Vector3 basePosition;
     private bool lowPrecision = false;
     private SkelTree skel = null;
@@ -351,7 +352,7 @@ public class BVHRecorder : MonoBehaviour {
         Quaternion rot = skel.transform.rotation;
         skel.transform.rotation = Quaternion.identity;
         boneOrder = new List<SkelTree>() { skel };
-        Vector3 rootOffset = skel.transform.position - basePosition;
+        rootOffset = skel.transform.position - basePosition;
         hierarchy = "HIERARCHY\nROOT " + skel.name + "\n{\n\tOFFSET\t" + getOffset(rootOffset) + "\n\tCHANNELS 6 Xposition Yposition Zposition Zrotation Xrotation Yrotation\n";
 
         if (skel.children.Any()) {
@@ -377,7 +378,7 @@ public class BVHRecorder : MonoBehaviour {
             throw new InvalidOperationException("Hierarchy not initialized. You can initialize the hierarchy by calling genHierarchy().");
         }
 
-        string frame = getOffset(skel.transform.position - basePosition);
+        string frame = getOffset(skel.transform.position - rootOffset);
         foreach (SkelTree bone in boneOrder) {
             frame += "\t";
             if (bone == skel) {

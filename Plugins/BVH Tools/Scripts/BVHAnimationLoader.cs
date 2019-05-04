@@ -171,6 +171,12 @@ public class BVHAnimationLoader : MonoBehaviour {
 
         float time = 0f;
         if (posX && posY && posZ) {
+            Vector3 offset;
+            if (blender) {
+                offset = new Vector3(-node.offsetX, node.offsetZ, -node.offsetY);
+            } else {
+                offset = new Vector3(-node.offsetX, node.offsetY, node.offsetZ);
+            }
             for (int i = 0; i < frames; i++) {
                 time += 1f / frameRate;
                 keyframes[0][i].time = time;
@@ -186,7 +192,7 @@ public class BVHAnimationLoader : MonoBehaviour {
                     keyframes[2][i].value = values[2][i];
                 }
                 if (first) {
-                    Vector3 bvhPosition = bone.transform.InverseTransformPoint(new Vector3(keyframes[0][i].value, keyframes[1][i].value, keyframes[2][i].value) + targetAvatar.transform.position);
+                    Vector3 bvhPosition = bone.transform.InverseTransformPoint(new Vector3(keyframes[0][i].value, keyframes[1][i].value, keyframes[2][i].value) + targetAvatar.transform.position + offset);
                     keyframes[0][i].value = bvhPosition.x;
                     keyframes[1][i].value = bvhPosition.y;
                     keyframes[2][i].value = bvhPosition.z;
