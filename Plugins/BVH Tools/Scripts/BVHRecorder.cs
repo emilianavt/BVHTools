@@ -374,7 +374,8 @@ public class BVHRecorder : MonoBehaviour {
         }
 
         StringBuilder sb = new StringBuilder();
-        sb.Append(getOffset(skel.transform.position - basePosition));
+        Vector3 scale = new Vector3(1f/targetAvatar.transform.localScale.x, 1f/targetAvatar.transform.localScale.y, 1f/targetAvatar.transform.localScale.z);
+        sb.Append(getOffset(Vector3.Scale(skel.transform.position - basePosition, scale)));
         foreach (SkelTree bone in boneOrder) {
             sb.Append("\t");
             if (bone == skel) {
