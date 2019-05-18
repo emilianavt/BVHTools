@@ -52,6 +52,7 @@ public class BVHRecorder : MonoBehaviour {
     public string lastSavedFile = "";
 
     private Vector3 basePosition;
+    private Vector3 offsetScale;
     private bool lowPrecision = false;
     private SkelTree skel = null;
     private List<SkelTree> boneOrder = null;
@@ -269,6 +270,7 @@ public class BVHRecorder : MonoBehaviour {
 
     // This formats local translation vectors
     private string getOffset(Vector3 offset) {
+        offset = Vector3.Scale(offset, offsetScale);
         Vector3 offset2 = new Vector3(-offset.x, offset.y, offset.z);
         if (blender) {
             offset2 = new Vector3(-offset.x, -offset.z, offset.y);
@@ -357,6 +359,8 @@ public class BVHRecorder : MonoBehaviour {
             throw new InvalidOperationException("Skeleton not initialized. You can initialize the skeleton by calling buildSkeleton().");
         }
 
+        offsetScale = new Vector3(1f/targetAvatar.transform.localScale.x, 1f/targetAvatar.transform.localScale.y, 1f/targetAvatar.transform.localScale.z);
+
         Quaternion rot = skel.transform.rotation;
         skel.transform.rotation = Quaternion.identity;
         boneOrder = new List<SkelTree>() { skel };
@@ -386,8 +390,7 @@ public class BVHRecorder : MonoBehaviour {
         }
 
         StringBuilder sb = new StringBuilder();
-        Vector3 scale = new Vector3(1f/targetAvatar.transform.localScale.x, 1f/targetAvatar.transform.localScale.y, 1f/targetAvatar.transform.localScale.z);
-        sb.Append(getOffset(Vector3.Scale(skel.transform.position - basePosition, scale)));
+        sb.Append(getOffset(skel.transform.position - basePosition));
         foreach (SkelTree bone in boneOrder) {
             sb.Append("\t");
             if (bone == skel) {
