@@ -12,7 +12,7 @@ public class BVHAnimationLoader : MonoBehaviour {
     public string filename;
     [Tooltip("When this option is set, the BVH file will be assumed to have the Z axis as up and the Y axis as forward instead of the normal BVH conventions.")]
     public bool blender = true;
-    [Tooltip("When this flag is set, the frame time in the BVH time will be used instead of the one given above.")]
+    [Tooltip("When this flag is set, the frame time in the BVH time will be used to determine the frame rate instead of using the one given below.")]
     public bool respectBVHTime = true;
     [Tooltip("If the flag above is disabled, the frame rate given in the BVH file will be overridden by this value.")]
     public float frameRate = 60.0f;
@@ -193,9 +193,9 @@ public class BVHAnimationLoader : MonoBehaviour {
                 }
                 if (first) {
                     Vector3 bvhPosition = bone.transform.parent.InverseTransformPoint(new Vector3(keyframes[0][i].value, keyframes[1][i].value, keyframes[2][i].value) + targetAvatar.transform.position + offset);
-                    keyframes[0][i].value = bvhPosition.x;
-                    keyframes[1][i].value = bvhPosition.y;
-                    keyframes[2][i].value = bvhPosition.z;
+                    keyframes[0][i].value = bvhPosition.x * targetAvatar.transform.localScale.x;
+                    keyframes[1][i].value = bvhPosition.y * targetAvatar.transform.localScale.y;
+                    keyframes[2][i].value = bvhPosition.z * targetAvatar.transform.localScale.z;
                 }
             }
             if (first) {
