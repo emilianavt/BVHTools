@@ -124,7 +124,7 @@ component at startup.
 #### `bool capturing`
 
 When this flag is set, motion will be captured at the interval given by
-`frameTime`. It is possible to pause and resume capturing by setting this
+`frameRate`. It is possible to pause and resume capturing by setting this
 flag at any time.
 
 #### `bool blender`
@@ -149,8 +149,9 @@ in the generated file.
 
 Setting this to true will allow capturing with the `capturing` flag to speed
 up after if the frame rate drops, to keep the duration of the captured
-animation correct. Disabling this flag will ensure that at least `frameTime`
-milliseconds pass after every captured frame.
+animation correct. Disabling this flag will ensure that at least as many
+milliseconds pass after every captured frame, as one frame should require,
+according to the given `frameRate`.
 
 #### `int frameNumber` (read-only)
 
