@@ -280,10 +280,19 @@ public class BVHAnimationLoader : MonoBehaviour {
         throw new InvalidOperationException("No path between transforms " + target.name + " and " + root.name + " found.");
     }
 
-	public void loadAnimation() {
+    private void getTargetAvatar() {
+        if (targetAvatar == null) {
+            targetAvatar = GetComponent<Animator>();
+        }
         if (targetAvatar == null) {
             throw new InvalidOperationException("No target avatar set.");
         }
+
+    }
+
+	public void loadAnimation() {
+        getTargetAvatar();
+
         if (bp == null) {
             throw new InvalidOperationException("No BVH file has been parsed.");
         }
@@ -386,7 +395,7 @@ public class BVHAnimationLoader : MonoBehaviour {
         if (bp == null) {
             throw new InvalidOperationException("No BVH file has been parsed.");
         }
-        if (clip == null) {
+        if (anim == null || clip == null) {
             loadAnimation();
         }
         anim.Play(clip.name);

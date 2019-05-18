@@ -142,11 +142,19 @@ public class BVHRecorder : MonoBehaviour {
         return root;
     }
 
+    private void getTargetAvatar() {
+        if (targetAvatar == null) {
+            targetAvatar = GetComponent<Animator>();
+        }
+        if (targetAvatar == null) {
+            throw new InvalidOperationException("No target avatar set.");
+        }
+
+    }
+
     // This function tries to find all Transforms that are bones of the character
     public void getBones() {
-        if (targetAvatar == null) {
-            throw new InvalidOperationException("Target avatar has to be set before calling getBones().");
-        }
+        getTargetAvatar();
 
         if (enforceHumanoidBones) {
             populateBoneMap(out boneMap, targetAvatar);
@@ -212,6 +220,8 @@ public class BVHRecorder : MonoBehaviour {
     
     // This builds a minimal tree covering all detected bones that will be used to generate the hierarchy section of the BVH file
     public void buildSkeleton() {
+        getTargetAvatar();
+
         cleanupBones();
         if (bones.Count == 0) {
             throw new InvalidOperationException("Target avatar, root bone and the bones list have to be set before calling buildSkeleton(). You can initialize bones list by calling getBones().");
@@ -341,6 +351,8 @@ public class BVHRecorder : MonoBehaviour {
 
     // This function generates the hierarchy section of the BVH file
     public void genHierarchy() {
+        getTargetAvatar();
+
         if (skel == null) {
             throw new InvalidOperationException("Skeleton not initialized. You can initialize the skeleton by calling buildSkeleton().");
         }
