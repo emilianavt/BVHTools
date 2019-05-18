@@ -276,7 +276,7 @@ frame time given in the BVH file.
 #### `bool respectBVHTime`
 
 When this flag is set, the frame duration will not be overridden by the value
-set in `frameTime`.
+set in `frameRate`.
 
 #### `string clipName`
 
