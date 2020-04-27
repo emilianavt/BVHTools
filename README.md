@@ -28,6 +28,16 @@ All fields have tooltips, so if you want to delve deeper, please take a look at
 them. The component also provides a simple API. Looking at the corresponding
 Editor script should give something of an overview.
 
+### Rest pose
+
+If the bones of the model being recorded do not have rotations of zero in the
+rest pose, the rest pose in the resulting BVH file can look very odd. As a
+workaround, exporting the model to VRM format using
+[UniVRM](https://github.com/vrm-c/UniVRM) and importing it back into unity will
+produce a model with zero rotation bones. A short guide about the process can be
+found
+[here](https://gist.github.com/emilianavt/51d8399987d67544fdebfe2ebd9a5149).
+
 ## Editing
 
 If you want to edit your file in Blender, please enable the "Blender" checkbox
