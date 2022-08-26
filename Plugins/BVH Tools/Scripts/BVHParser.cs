@@ -242,6 +242,34 @@ public class BVHParser {
         if (!digitFound) {
             v = float.NaN;
         }
+        
+        // Parse scientific notation
+        if (digitFound && pos < bvhText.Length && (bvhText[pos] == 'e' || bvhText[pos] == 'E'))
+        {
+            pos++;
+
+            int scientificSign = 1;
+            if (pos < bvhText.Length && bvhText[pos] == '-')
+            {
+                scientificSign = -1;
+                pos++;
+            }
+            else if (pos < bvhText.Length && bvhText[pos] == '+')
+            {
+                pos++;
+            }
+
+            int power = 0;
+            while (pos < bvhText.Length && bvhText[pos] >= '0' && bvhText[pos] <= '9')
+            {
+                power = power * 10 + (bvhText[pos++] - '0');
+            }
+
+            power *= scientificSign;
+
+            v *= (float)Math.Pow(10, power);
+        }
+        
         return digitFound;
     }
 
